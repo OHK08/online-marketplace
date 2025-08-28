@@ -1,13 +1,30 @@
 // backend/src/models/OTP.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
 const OTPSchema = new Schema({
-  phone: { type: String, required: true, index: true },
-  code: { type: String, required: true }, // in prod: hash this value
-  attempts: { type: Number, default: 0 },
-  verified: { type: Boolean, default: false },
-  expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } }
+  email: { 
+    type: String, 
+    required: true, 
+    index: true 
+  },
+  code: { 
+    type: String, 
+    required: true 
+  },
+  attempts: { 
+    type: Number, 
+    default: 0 
+  },
+  verified: { 
+    type: Boolean, 
+    default: false 
+  },
+  expiresAt: { 
+    type: Date, 
+    required: true, 
+    index: { expireAfterSeconds: 0 } 
+  }
 }, { timestamps: true });
 
-module.exports = mongoose.model('OTP', OTPSchema);
+module.exports = mongoose.model("OTP", OTPSchema);

@@ -54,6 +54,10 @@ const ArtworkSchema = new Schema({
         type: String, 
         enum: ['draft','published','removed'], 
         default: 'published' 
+    },
+    likeCount: { 
+        type: Number, 
+        default: 0 
     }
 }, { timestamps: true });
 
