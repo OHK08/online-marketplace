@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import marketplaceHero from '@/assets/marketplace-hero.jpg';
+import Footer from '../components/layout/footer';
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -55,6 +56,7 @@ const Login = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen flex">
       {/* Left side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
@@ -161,6 +163,8 @@ const Login = () => {
         </div>
       </div>
     </div>
+    <Footer />
+    </>
   );
 };
 

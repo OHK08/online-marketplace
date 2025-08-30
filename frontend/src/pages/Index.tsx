@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ShoppingBag, Store, Users, TrendingUp } from 'lucide-react';
 import marketplaceHero from '@/assets/marketplace-hero.jpg';
+import Footer from '../components/layout/footer';
 
 const Index = () => {
   return (
@@ -139,11 +140,7 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; 2024 MarketPlace. Built with ❤️ for creators and entrepreneurs.</p>
-        </div>
-      </footer>
+       <Footer />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { SignupForm } from '@/components/signup/SignupForm';
 import { SuccessMessage } from '@/components/signup/SuccessMessage';
 import { Button } from '@/components/ui/button';
 import marketplaceHero from '@/assets/marketplace-hero.jpg';
+import Footer from '../components/layout/footer';
 
 type SignupStep = 'userType' | 'form' | 'success';
 
@@ -128,6 +129,7 @@ const Signup = () => {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 };
