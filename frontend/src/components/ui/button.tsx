@@ -18,9 +18,6 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        marketplace: "bg-marketplace-primary text-white hover:bg-marketplace-primary-light transition-smooth button-shadow hover:shadow-lg transform hover:scale-105",
-        seller: "signup-gradient text-white hover:opacity-90 transition-smooth button-shadow",
-        customer: "bg-marketplace-secondary text-white hover:bg-marketplace-secondary/90 transition-smooth button-shadow",
       },
       size: {
         default: "h-10 px-4 py-2",
