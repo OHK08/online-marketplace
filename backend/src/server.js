@@ -1,32 +1,61 @@
-// server.js
-
-// Load env variables first
-require("dotenv").config();
-
 const express = require("express");
-const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const cookieParser = require("cookie-parser");
 const cors = require("cors");
+// const fileUpload = require("express-fileupload");
 
-const authRoutes = require("./routes/authRoutes");
-
-const app = express();
-
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Configs
+const database = require("./config/database");
+const { cloudinaryConnect } = require("./config/cloudinary");
 
 // Routes
-app.use("/auth", authRoutes);
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
+const artworkRoutes = require("./routes/artworkRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const likeRoutes = require("./routes/likeRoutes");
 
-// Database connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
-  console.log("✅ MongoDB connected");
-  app.listen(process.env.PORT || 5000, () => {
-    console.log(`🚀 Server running on port ${process.env.PORT || 5000}`);
+// Initialize app
+dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// ------------------- Database & Cloudinary -------------------
+database.connect();
+cloudinaryConnect();
+
+// ------------------- Middlewares -------------------
+app.use(express.json());
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "*",
+    credentials: true,
+  })
+);
+// app.use(
+//   fileUpload({
+//     useTempFiles: true,
+//     tempFileDir: "/tmp/",
+//   })
+// );
+
+// ------------------- Routes -------------------
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/user", userRoutes);
+app.use("/api/v1/artworks", artworkRoutes);
+app.use("/api/v1/order", orderRoutes);
+app.use("/api/v1/like", likeRoutes);
+
+// ------------------- Health Check -------------------
+app.get("/", (req, res) => {
+  return res.json({
+    success: true,
+    message: "Your server is running",
   });
-}).catch(err => {
-  console.error("❌ DB connection error:", err.message);
+});
+
+// ------------------- Start Server -------------------
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
