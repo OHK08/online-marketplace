@@ -79,12 +79,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (credentials: LoginCredentials) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const { token, user } = await authService.login(credentials);
+      const response = await authService.login(credentials);
       
-      localStorage.setItem('auth_token', token);
+      // Handle MongoDB _id and convert to id for frontend consistency
+      const user = {
+        ...response.user,
+        id: response.user._id || response.user.id,
+      };
+      
+      localStorage.setItem('auth_token', response.token);
       localStorage.setItem('auth_user', JSON.stringify(user));
       
-      dispatch({ type: 'SET_AUTH', payload: { user, token } });
+      dispatch({ type: 'SET_AUTH', payload: { user, token: response.token } });
       
       toast({
         title: 'Welcome back!',
@@ -104,16 +110,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signup = async (payload: SignupPayload) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const { token, user } = await authService.signup(payload);
+      await authService.signup(payload);
       
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('auth_user', JSON.stringify(user));
-      
-      dispatch({ type: 'SET_AUTH', payload: { user, token } });
+      dispatch({ type: 'SET_LOADING', payload: false });
       
       toast({
         title: 'Account created!',
-        description: 'Welcome to the marketplace!',
+        description: 'Please login with your credentials.',
       });
     } catch (error: any) {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -155,7 +158,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const loadProfile = async () => {
     try {
-      const { user } = await authService.getProfile();
+      const response = await authService.getProfile();
+      const user = {
+        ...response.user,
+        id: response.user._id || response.user.id,
+      };
       localStorage.setItem('auth_user', JSON.stringify(user));
       dispatch({ type: 'SET_USER', payload: user });
     } catch (error: any) {

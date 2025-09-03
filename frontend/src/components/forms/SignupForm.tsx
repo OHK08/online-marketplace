@@ -15,9 +15,13 @@ const signupSchema = z.object({
   phone: z.string().min(10, 'Please enter a valid phone number'),
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string().min(8, 'Please confirm your password'),
   bio: z.string().max(280, 'Bio must be less than 280 characters').optional(),
   avatarUrl: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   otp: z.string().length(6, 'OTP must be 6 digits'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type SignupFormData = z.infer<typeof signupSchema>;
@@ -31,7 +35,7 @@ export const SignupForm = () => {
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      name: '', phone: '', email: '', password: '', bio: '', avatarUrl: '', otp: ''
+      name: '', phone: '', email: '', password: '', confirmPassword: '', bio: '', avatarUrl: '', otp: ''
     },
   });
 
@@ -51,7 +55,7 @@ export const SignupForm = () => {
   const onSubmit = async (data: SignupFormData) => {
     try {
       await signup(data as SignupPayload);
-      navigate('/dashboard');
+      navigate('/login');
     } catch (error) {
       // Error handled by AuthContext
     }
@@ -139,6 +143,19 @@ export const SignupForm = () => {
               <FormLabel>Password</FormLabel>
               <FormControl>
                 <Input type="password" placeholder="Create a password" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm Password</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="Confirm your password" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
