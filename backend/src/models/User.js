@@ -33,7 +33,11 @@ const UserSchema = new Schema({
     },
     lastSeen: { 
         type: Date 
-    }
+    },
+    likes: [{ 
+            type: Schema.Types.ObjectId, 
+            ref: "Artwork" 
+        }]
     }, { 
         timestamps: true 
     });

@@ -18,31 +18,17 @@ exports.createArtwork = async (req, res) => {
       });
     }
 
-    // Prepare media array
-    let media = [];
-
-    // Handle file upload(s)
-    if (req.files && req.files.media) {
-      const files = Array.isArray(req.files.media) ? req.files.media : [req.files.media];
-
-      for (const file of files) {
-        const uploadResult = await cloudinary.uploader.upload(file.tempFilePath, {
-          folder: "artworks",
-          resource_type: file.mimetype.startsWith("video") ? "video" : "image",
-        });
-
-        media.push({
-          url: uploadResult.secure_url,
-          type: uploadResult.resource_type,
-          sizeBytes: file.size,
-          storageKey: uploadResult.public_id,
-        });
-      }
-    }
+    // Build media array from multer-cloudinary output
+    let media = (req.files || []).map((file) => ({
+      url: file.path,              // secure_url from Cloudinary
+      type: file.mimetype.startsWith("video") ? "video" : "image",
+      sizeBytes: file.size,
+      storageKey: file.filename,   // Cloudinary public_id
+    }));
 
     // Create artwork in DB
     const artwork = await Artwork.create({
-      artistId: req.user.id, // from authMiddleware
+      artistId: req.user.id,
       title,
       description,
       price,
@@ -58,7 +44,6 @@ exports.createArtwork = async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating artwork:", err);
-
     res.status(500).json({
       success: false,
       message: "Internal server error while creating artwork",

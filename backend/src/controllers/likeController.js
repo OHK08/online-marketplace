@@ -1,5 +1,7 @@
+// backend/src/controllers/likeController.js
 const Like = require("../models/Like");
 const Artwork = require("../models/Artwork");
+const User = require("../models/User");
 
 // ------------------ LIKE / UNLIKE ARTWORK ------------------
 exports.likeArtwork = async (req, res) => {
@@ -14,6 +16,7 @@ exports.likeArtwork = async (req, res) => {
       // Unlike
       await existingLike.deleteOne();
       await Artwork.findByIdAndUpdate(artworkId, { $inc: { likeCount: -1 } });
+      await User.findByIdAndUpdate(userId, { $pull: { likes: artworkId } });
 
       return res.json({
         success: true,
@@ -23,6 +26,7 @@ exports.likeArtwork = async (req, res) => {
       // Like
       await Like.create({ userId, artworkId });
       await Artwork.findByIdAndUpdate(artworkId, { $inc: { likeCount: 1 } });
+      await User.findByIdAndUpdate(userId, { $addToSet: { likes: artworkId } });
 
       return res.json({
         success: true,
@@ -43,13 +47,19 @@ exports.getLikedArtworks = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const likes = await Like.find({ userId }).populate("artworkId");
-    const likedArtworks = likes.map((l) => l.artworkId);
+    // ✅ Now we can fetch directly from User
+    const user = await User.findById(userId)
+      .populate("likes") // populate artworks liked
+      .select("likes");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
 
     res.json({
       success: true,
-      count: likedArtworks.length,
-      artworks: likedArtworks,
+      count: user.likes.length,
+      artworks: user.likes,
     });
   } catch (err) {
     console.error("Error in getLikedArtworks:", err);
