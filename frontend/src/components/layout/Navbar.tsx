@@ -51,7 +51,10 @@ export const Navbar = () => {
   };
 
   const toggleMode = () => {
-    setMode(mode === 'customer' ? 'seller' : 'customer');
+    const newMode = mode === 'customer' ? 'seller' : 'customer';
+    setMode(newMode);
+    // Navigate to dashboard which will show the appropriate view based on mode
+    navigate('/dashboard');
   };
 
   const NavContent = () => (

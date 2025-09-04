@@ -6,28 +6,35 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import { aiClient } from '@/services/aiClient';
+import { artworkService } from '@/services/artwork';
+import { useToast } from '@/hooks/use-toast';
 
 const newPostSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   price: z.number().min(0.01, 'Price must be greater than 0'),
-  category: z.string().min(1, 'Category is required'),
-  stock: z.number().min(0, 'Stock cannot be negative'),
-  status: z.enum(['Draft', 'Published']),
+  quantity: z.number().min(1, 'Quantity must be at least 1'),
+  media: z.any().optional(),
 });
 
 type NewPostFormData = z.infer<typeof newPostSchema>;
 
 export const NewPostForm = () => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewFiles, setPreviewFiles] = useState<Array<{ file: File; url: string }>>([]);
+  const { toast } = useToast();
 
   const form = useForm<NewPostFormData>({
     resolver: zodResolver(newPostSchema),
     defaultValues: {
-      title: '', description: '', price: 0, category: '', stock: 0, status: 'Draft'
+      title: '', 
+      description: '', 
+      price: 0, 
+      quantity: 1,
     },
   });
 
@@ -47,9 +54,73 @@ export const NewPostForm = () => {
     }
   };
 
-  const onSubmit = (data: NewPostFormData) => {
-    console.log('New post data:', data);
-    // Handle form submission
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Clean up previous URLs
+    previewFiles.forEach(preview => URL.revokeObjectURL(preview.url));
+    
+    // Create new previews
+    const newPreviews = files.map(file => ({
+      file,
+      url: URL.createObjectURL(file)
+    }));
+    
+    setPreviewFiles(newPreviews);
+    
+    // Update form data
+    const fileList = new DataTransfer();
+    files.forEach(file => fileList.items.add(file));
+    form.setValue('media', [{ files: fileList.files }]);
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    const updatedPreviews = previewFiles.filter((_, index) => index !== indexToRemove);
+    
+    // Revoke URL for removed file
+    URL.revokeObjectURL(previewFiles[indexToRemove].url);
+    
+    setPreviewFiles(updatedPreviews);
+    
+    // Update form data
+    const fileList = new DataTransfer();
+    updatedPreviews.forEach(preview => fileList.items.add(preview.file));
+    form.setValue('media', fileList.files.length > 0 ? [{ files: fileList.files }] : undefined);
+  };
+
+  const onSubmit = async (data: NewPostFormData) => {
+    setIsSubmitting(true);
+    try {
+      const mediaFiles = data.media?.[0]?.files as FileList | undefined;
+      
+      await artworkService.createArtwork({
+        title: data.title,
+        description: data.description,
+        price: data.price,
+        quantity: data.quantity,
+        media: mediaFiles,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Product created successfully!',
+      });
+
+      // Clean up preview URLs
+      previewFiles.forEach(preview => URL.revokeObjectURL(preview.url));
+      setPreviewFiles([]);
+      
+      form.reset();
+    } catch (error) {
+      console.error('Error creating artwork:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to create product. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -102,7 +173,7 @@ export const NewPostForm = () => {
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price ($)</FormLabel>
+                <FormLabel>Price (₹)</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -119,16 +190,16 @@ export const NewPostForm = () => {
           
           <FormField
             control={form.control}
-            name="stock"
+            name="quantity"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Stock</FormLabel>
+                <FormLabel>Quantity</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
-                    placeholder="0"
+                    placeholder="1"
                     {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                   />
                 </FormControl>
                 <FormMessage />
@@ -137,56 +208,69 @@ export const NewPostForm = () => {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="art">Art & Crafts</SelectItem>
-                    <SelectItem value="fashion">Fashion</SelectItem>
-                    <SelectItem value="home">Home & Garden</SelectItem>
-                    <SelectItem value="jewelry">Jewelry</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <FormField
+          control={form.control}
+          name="media"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Product Images</FormLabel>
+              <FormControl>
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <Input
+                    type="file"
+                    multiple
+                    accept="image/*,video/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="media-upload"
+                  />
+                  <label htmlFor="media-upload" className="cursor-pointer">
+                    <p className="text-sm text-muted-foreground mb-1">
+                      Click to upload or drag and drop
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, GIF up to 10MB (Max 5 files)
+                    </p>
+                  </label>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <FormField
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Status</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Published">Published</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        {previewFiles.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-foreground">Preview ({previewFiles.length}/5)</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {previewFiles.map((preview, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={preview.url}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-24 object-contain rounded-lg border border-border bg-black"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                  <div className="absolute bottom-1 left-1 bg-black/70 text-white text-xs px-1 rounded">
+                    {Math.round(preview.file.size / 1024)}KB
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-        <Button type="submit" className="w-full btn-gradient">
-          Save Product
+        <Button type="submit" className="w-full btn-gradient" disabled={isSubmitting}>
+          {isSubmitting ? 'Creating Product...' : 'Create Product'}
         </Button>
       </form>
     </Form>

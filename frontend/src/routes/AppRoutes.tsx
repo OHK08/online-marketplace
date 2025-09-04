@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { RequireAuth } from './RequireAuth';
+import { useUI } from '@/context/UIContext';
 
 // Pages
 import LandingPage from '@/pages/LandingPage';
@@ -14,24 +15,23 @@ import WishlistPage from '@/pages/WishlistPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 export const AppRoutes = () => {
+  const { mode } = useUI();
+
   return (
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<MainLayout><LandingPage /></MainLayout>} />
       <Route path="/signup" element={<MainLayout><SignupPage /></MainLayout>} />
       <Route path="/login" element={<MainLayout><LoginPage /></MainLayout>} />
-      {/* <Route path="/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} />
-      <Route path="/seller" element={<MainLayout><SellerPage /></MainLayout>} />
-      <Route path="/profile" element={<MainLayout><ProfilePage /></MainLayout>} />
-      <Route path="/orders" element={<MainLayout><OrderHistoryPage /></MainLayout>} />
-      <Route path="/wishlist" element={<MainLayout><WishlistPage /></MainLayout>} /> */}
       
-      {/* Protected routes */}
+      {/* Protected routes - Main app route switches based on mode */}
       <Route 
         path="/dashboard" 
         element={
           <RequireAuth>
-            <MainLayout><DashboardPage /></MainLayout>
+            <MainLayout>
+              {mode === 'customer' ? <DashboardPage /> : <SellerPage />}
+            </MainLayout>
           </RequireAuth>
         } 
       />
