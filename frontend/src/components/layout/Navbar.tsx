@@ -164,6 +164,22 @@ export const Navbar = () => {
         </div>
 
         {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center space-x-8">
+          <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+            Explore
+          </a>
+          <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+            Categories  
+          </a>
+          <a href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+            About
+          </a>
+          <a href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
+            Contact
+          </a>
+        </div>
+
+        {/* Desktop User Actions */}
         <div className="hidden md:flex">
           <NavContent />
         </div>

@@ -16,6 +16,7 @@ const newPostSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   price: z.number().min(0.01, 'Price must be greater than 0'),
+  currency: z.string().min(1, 'Currency is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
   media: z.any().optional(),
 });
@@ -34,6 +35,7 @@ export const NewPostForm = () => {
       title: '', 
       description: '', 
       price: 0, 
+      currency: 'INR',
       quantity: 1,
     },
   });
@@ -57,21 +59,25 @@ export const NewPostForm = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
-    // Clean up previous URLs
-    previewFiles.forEach(preview => URL.revokeObjectURL(preview.url));
+    // Limit to 5 files maximum
+    const limitedFiles = files.slice(0, 5 - previewFiles.length);
     
-    // Create new previews
-    const newPreviews = files.map(file => ({
+    // Create new previews and add to existing ones
+    const newPreviews = limitedFiles.map(file => ({
       file,
       url: URL.createObjectURL(file)
     }));
     
-    setPreviewFiles(newPreviews);
+    const allPreviews = [...previewFiles, ...newPreviews];
+    setPreviewFiles(allPreviews);
     
-    // Update form data
+    // Update form data with all files
     const fileList = new DataTransfer();
-    files.forEach(file => fileList.items.add(file));
-    form.setValue('media', [{ files: fileList.files }]);
+    allPreviews.forEach(preview => fileList.items.add(preview.file));
+    form.setValue('media', fileList.files.length > 0 ? fileList.files : undefined);
+    
+    // Reset input value to allow re-selecting same files
+    e.target.value = '';
   };
 
   const removeFile = (indexToRemove: number) => {
@@ -85,18 +91,19 @@ export const NewPostForm = () => {
     // Update form data
     const fileList = new DataTransfer();
     updatedPreviews.forEach(preview => fileList.items.add(preview.file));
-    form.setValue('media', fileList.files.length > 0 ? [{ files: fileList.files }] : undefined);
+    form.setValue('media', fileList.files.length > 0 ? fileList.files : undefined);
   };
 
   const onSubmit = async (data: NewPostFormData) => {
     setIsSubmitting(true);
     try {
-      const mediaFiles = data.media?.[0]?.files as FileList | undefined;
+      const mediaFiles = data.media as FileList | undefined;
       
       await artworkService.createArtwork({
         title: data.title,
         description: data.description,
         price: data.price,
+        currency: data.currency,
         quantity: data.quantity,
         media: mediaFiles,
       });
@@ -167,13 +174,13 @@ export const NewPostForm = () => {
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price (₹)</FormLabel>
+                <FormLabel>Price</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -183,6 +190,30 @@ export const NewPostForm = () => {
                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                   />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="currency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Currency</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="INR">₹ INR</SelectItem>
+                    <SelectItem value="USD">$ USD</SelectItem>
+                    <SelectItem value="EUR">€ EUR</SelectItem>
+                    <SelectItem value="GBP">£ GBP</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -230,7 +261,7 @@ export const NewPostForm = () => {
                       Click to upload or drag and drop
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      PNG, JPG, GIF up to 10MB (Max 5 files)
+                      PNG, JPG, GIF up to 10MB ({previewFiles.length}/5 files)
                     </p>
                   </label>
                 </div>
@@ -249,7 +280,7 @@ export const NewPostForm = () => {
                   <img
                     src={preview.url}
                     alt={`Preview ${index + 1}`}
-                    className="w-full h-24 object-contain rounded-lg border border-border bg-black"
+                    className="w-full h-24 object-cover rounded-lg border border-border"
                   />
                   <Button
                     type="button"

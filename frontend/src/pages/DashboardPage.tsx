@@ -10,6 +10,7 @@ interface ItemCardData {
   title: string;
   description: string;
   price: number;
+  currency: string;
   image: string;
   seller: { id: string; name: string; avatar: string; };
   likes: number;
@@ -33,6 +34,7 @@ const DashboardPage = () => {
             title: artwork.title,
             description: artwork.description || '',
             price: artwork.price,
+            currency: artwork.currency,
             image: artwork.media[0]?.url || '/placeholder.svg',
             seller: {
               id: artwork.artistId._id,

@@ -12,6 +12,7 @@ const mockWishlistItems = [
     title: 'Vintage Leather Journal',
     description: 'Premium leather-bound journal with handmade paper pages.',
     price: 45.00,
+    currency: 'USD',
     image: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400',
     seller: {
       id: '2',
@@ -27,6 +28,7 @@ const mockWishlistItems = [
     title: 'Organic Skincare Set',
     description: 'Natural skincare products made with organic ingredients.',
     price: 92.00,
+    currency: 'USD',
     image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400',
     seller: {
       id: '6',

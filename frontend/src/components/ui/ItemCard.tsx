@@ -10,6 +10,7 @@ interface ItemCardProps {
     title: string;
     description: string;
     price: number;
+    currency: string;
     image: string;
     seller: { id: string; name: string; avatar: string; };
     likes: number;
@@ -28,8 +29,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onLike, onWishlist, va
     copyLink(`${window.location.origin}/item/${item.id}`, item.title);
   };
 
+  const getCurrencySymbol = (currency: string) => {
+    const symbols: { [key: string]: string } = {
+      'INR': '₹',
+      'USD': '$',
+      'EUR': '€',
+      'GBP': '£'
+    };
+    return symbols[currency] || currency;
+  };
+
   return (
-    <Card className="card-hover overflow-hidden">
+    <Card className="card-hover overflow-hidden cursor-pointer" onClick={() => window.location.href = `/artwork/${item.id}`}>
       <div className="relative">
         <img src={item.image} alt={item.title} className="w-full h-48 object-cover" />
         <Button
@@ -45,7 +56,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onLike, onWishlist, va
         <h3 className="font-semibold mb-2">{item.title}</h3>
         <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{item.description}</p>
         <div className="flex justify-between items-center mb-3">
-          <span className="text-lg font-bold">${item.price}</span>
+          <span className="text-lg font-bold">{getCurrencySymbol(item.currency)}{item.price}</span>
           <div className="flex items-center gap-2">
             <Avatar className="w-6 h-6">
               <AvatarImage src={item.seller.avatar} />

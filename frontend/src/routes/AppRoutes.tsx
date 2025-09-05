@@ -13,6 +13,9 @@ import ProfilePage from '@/pages/ProfilePage';
 import OrderHistoryPage from '@/pages/OrderHistoryPage';
 import WishlistPage from '@/pages/WishlistPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+import { ArtworkDetailPage } from '@/pages/ArtworkDetailPage';
+import { AboutPage } from '@/pages/AboutPage';
+import { ContactPage } from '@/pages/ContactPage';
 
 export const AppRoutes = () => {
   const { mode } = useUI();
@@ -23,6 +26,8 @@ export const AppRoutes = () => {
       <Route path="/" element={<MainLayout><LandingPage /></MainLayout>} />
       <Route path="/signup" element={<MainLayout><SignupPage /></MainLayout>} />
       <Route path="/login" element={<MainLayout><LoginPage /></MainLayout>} />
+      <Route path="/about" element={<MainLayout><AboutPage /></MainLayout>} />
+      <Route path="/contact" element={<MainLayout><ContactPage /></MainLayout>} />
       
       {/* Protected routes - Main app route switches based on mode */}
       <Route 
@@ -32,6 +37,14 @@ export const AppRoutes = () => {
             <MainLayout>
               {mode === 'customer' ? <DashboardPage /> : <SellerPage />}
             </MainLayout>
+          </RequireAuth>
+        } 
+      />
+      <Route 
+        path="/artwork/:id" 
+        element={
+          <RequireAuth>
+            <MainLayout><ArtworkDetailPage /></MainLayout>
           </RequireAuth>
         } 
       />
