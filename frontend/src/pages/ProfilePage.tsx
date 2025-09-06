@@ -4,9 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Edit, Mail, Phone, Calendar, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { format } from 'date-fns';
+import { EditProfileForm } from '@/components/forms/EditProfileForm';
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -54,14 +56,22 @@ const ProfilePage = () => {
                 )}
               </div>
               
-              <Button
-                onClick={() => setIsEditing(!isEditing)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                Edit Profile
-              </Button>
+              <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <Button
+                  onClick={() => setIsEditing(true)}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Profile
+                </Button>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Edit Profile</DialogTitle>
+                  </DialogHeader>
+                  <EditProfileForm onSuccess={() => setIsEditing(false)} />
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>

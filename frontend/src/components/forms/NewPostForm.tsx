@@ -18,6 +18,7 @@ const newPostSchema = z.object({
   price: z.number().min(0.01, 'Price must be greater than 0'),
   currency: z.string().min(1, 'Currency is required'),
   quantity: z.number().min(1, 'Quantity must be at least 1'),
+  status: z.enum(['draft', 'published']),
   media: z.any().optional(),
 });
 
@@ -37,6 +38,7 @@ export const NewPostForm = () => {
       price: 0, 
       currency: 'INR',
       quantity: 1,
+      status: 'draft' as const,
     },
   });
 
@@ -105,6 +107,7 @@ export const NewPostForm = () => {
         price: data.price,
         currency: data.currency,
         quantity: data.quantity,
+        status: data.status,
         media: mediaFiles,
       });
 
@@ -238,6 +241,28 @@ export const NewPostForm = () => {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="draft">Draft (Can be edited)</SelectItem>
+                  <SelectItem value="published">Published (Visible to all)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

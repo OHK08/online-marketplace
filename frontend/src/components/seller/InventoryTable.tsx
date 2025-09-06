@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Edit, Eye, Trash } from 'lucide-react';
 import { artworkService, type Artwork } from '@/services/artwork';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +15,15 @@ import { Loader } from '@/components/ui/Loader';
 export const InventoryTable = () => {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingArtwork, setEditingArtwork] = useState<Artwork | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    price: 0,
+    currency: 'INR',
+    quantity: 1,
+    status: 'draft'
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,9 +66,60 @@ export const InventoryTable = () => {
     }
   };
 
+  const getCurrencySymbol = (currency: string) => {
+    const symbols: { [key: string]: string } = {
+      'INR': '₹',
+      'USD': '$', 
+      'EUR': '€',
+      'GBP': '£'
+    };
+    return symbols[currency] || currency;
+  };
+
+  const handleEdit = (artwork: Artwork) => {
+    setEditingArtwork(artwork);
+    setEditForm({
+      title: artwork.title,
+      description: artwork.description || '',
+      price: artwork.price,
+      currency: artwork.currency,
+      quantity: artwork.quantity,
+      status: artwork.status
+    });
+  };
+
+  const handleUpdateArtwork = async () => {
+    if (!editingArtwork) return;
+    
+    try {
+      await artworkService.updateArtwork(editingArtwork._id, editForm);
+      
+      // Update local state
+      setArtworks(artworks.map(artwork => 
+        artwork._id === editingArtwork._id 
+          ? { ...artwork, ...editForm, status: editForm.status as 'draft' | 'published' | 'removed' }
+          : artwork
+      ));
+      
+      setEditingArtwork(null);
+      toast({
+        title: 'Success',
+        description: 'Artwork updated successfully.',
+      });
+    } catch (error) {
+      console.error('Error updating artwork:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error', 
+        description: 'Failed to update artwork.',
+      });
+    }
+  };
+
   if (loading) {
     return <Loader text="Loading your products..." />;
   }
+
   return (
     <Table>
       <TableHeader>
@@ -78,7 +143,7 @@ export const InventoryTable = () => {
           artworks.map((artwork) => (
             <TableRow key={artwork._id}>
               <TableCell className="font-medium">{artwork.title}</TableCell>
-              <TableCell>₹{artwork.price}</TableCell>
+              <TableCell>{getCurrencySymbol(artwork.currency)}{artwork.price}</TableCell>
               <TableCell>{artwork.quantity}</TableCell>
               <TableCell>
                 <Badge variant={artwork.status === 'published' ? 'default' : 'secondary'}>
@@ -91,9 +156,100 @@ export const InventoryTable = () => {
                   <Button variant="ghost" size="sm">
                     <Eye className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm">
-                    <Edit className="w-4 h-4" />
-                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        disabled={artwork.status === 'published'}
+                        onClick={() => handleEdit(artwork)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Edit Artwork</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="title">Title</Label>
+                          <Input
+                            id="title"
+                            value={editForm.title}
+                            onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea
+                            id="description"
+                            value={editForm.description}
+                            onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="price">Price</Label>
+                            <Input
+                              id="price"
+                              type="number"
+                              value={editForm.price}
+                              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value)})}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="currency">Currency</Label>
+                            <Select 
+                              value={editForm.currency} 
+                              onValueChange={(value) => setEditForm({...editForm, currency: value})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="INR">₹ INR</SelectItem>
+                                <SelectItem value="USD">$ USD</SelectItem>
+                                <SelectItem value="EUR">€ EUR</SelectItem>
+                                <SelectItem value="GBP">£ GBP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="quantity">Quantity</Label>
+                            <Input
+                              id="quantity"
+                              type="number"
+                              value={editForm.quantity}
+                              onChange={(e) => setEditForm({...editForm, quantity: parseInt(e.target.value)})}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="status">Status</Label>
+                            <Select 
+                              value={editForm.status} 
+                              onValueChange={(value) => setEditForm({...editForm, status: value})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="published">Published</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-4">
+                          <Button onClick={handleUpdateArtwork} className="flex-1">
+                            Update Artwork
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Button 
                     variant="ghost" 
                     size="sm"

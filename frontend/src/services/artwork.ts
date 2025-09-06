@@ -33,7 +33,17 @@ export interface CreateArtworkPayload {
   price: number;
   currency?: string;
   quantity?: number;
+  status?: string;
   media?: FileList;
+}
+
+export interface UpdateArtworkPayload {
+  title?: string;
+  description?: string;
+  price?: number;
+  currency?: string;
+  quantity?: number;
+  status?: string;
 }
 
 export interface ArtworkResponse {
@@ -68,6 +78,7 @@ export const artworkService = {
     formData.append('price', payload.price.toString());
     if (payload.currency) formData.append('currency', payload.currency);
     if (payload.quantity) formData.append('quantity', payload.quantity.toString());
+    if (payload.status) formData.append('status', payload.status);
     
     // Append media files
     if (payload.media && payload.media.length > 0) {
@@ -86,6 +97,11 @@ export const artworkService = {
 
   async deleteArtwork(id: string): Promise<ArtworkResponse> {
     const response = await apiClient.delete(`/artworks/${id}`);
+    return response.data;
+  },
+
+  async updateArtwork(id: string, payload: UpdateArtworkPayload): Promise<ArtworkResponse> {
+    const response = await apiClient.put(`/artworks/${id}`, payload);
     return response.data;
   },
 };
