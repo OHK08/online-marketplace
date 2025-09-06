@@ -24,4 +24,7 @@ router.delete("/:id", authMiddleware, artworkController.deleteArtwork);
 // my artworks
 router.get("/me/my-artworks", authMiddleware, artworkController.myArtworks);
 
+// edit artwork
+router.put("/:id", authMiddleware, artworkController.updateArtwork);
+
 module.exports = router;

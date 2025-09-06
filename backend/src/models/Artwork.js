@@ -53,7 +53,7 @@ const ArtworkSchema = new Schema({
     status: { 
         type: String, 
         enum: ['draft','published','removed'], 
-        default: 'published' 
+        default: 'draft' 
     },
     likeCount: { 
         type: Number, 

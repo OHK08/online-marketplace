@@ -9,7 +9,7 @@ exports.createArtwork = async (req, res) => {
     console.log("Incoming body:", req.body);
     console.log("Incoming files:", req.files);
 
-    const { title, description, price, currency, quantity } = req.body;
+    const { title, description, price, currency, quantity, status } = req.body;
 
     if (!title || !price) {
       return res.status(400).json({
@@ -34,6 +34,7 @@ exports.createArtwork = async (req, res) => {
       price,
       currency: currency || "INR",
       quantity: quantity || 1,
+      status: status || "draft", // default to draft
       media,
     });
 
@@ -51,6 +52,7 @@ exports.createArtwork = async (req, res) => {
     });
   }
 };
+
 
 
 // ------------------ GET ALL ARTWORKS ------------------
@@ -152,6 +154,56 @@ exports.myArtworks = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching user's artworks",
+    });
+  }
+};
+
+// ------------------ UPDATE ARTWORK ------------------
+exports.updateArtwork = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, price, currency, quantity, status } = req.body;
+
+    const artwork = await Artwork.findById(id);
+
+    if (!artwork) {
+      return res.status(404).json({ success: false, message: "Artwork not found" });
+    }
+
+    // Only owner can edit
+    if (artwork.artistId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Only editable if draft
+    if (artwork.status !== "draft") {
+      return res.status(400).json({
+        success: false,
+        message: "Only artworks in draft state can be edited",
+      });
+    }
+
+    // Apply updates
+    if (title) artwork.title = title;
+    if (description) artwork.description = description;
+    if (price) artwork.price = price;
+    if (currency) artwork.currency = currency;
+    if (quantity) artwork.quantity = quantity;
+    if (status) artwork.status = status; // e.g., switch to published after editing
+
+    await artwork.save();
+
+    res.json({
+      success: true,
+      message: "Artwork updated successfully",
+      artwork,
+    });
+  } catch (err) {
+    console.error("Error updating artwork:", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while updating artwork",
+      error: err.message,
     });
   }
 };
