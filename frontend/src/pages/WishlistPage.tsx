@@ -1,75 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ItemCard } from '@/components/ui/ItemCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Heart, Search, Grid, List } from 'lucide-react';
-
-// Mock wishlist data
-const mockWishlistItems = [
-  {
-    id: '2',
-    title: 'Vintage Leather Journal',
-    description: 'Premium leather-bound journal with handmade paper pages.',
-    price: 45.00,
-    currency: 'USD',
-    image: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=400',
-    seller: {
-      id: '2',
-      name: 'Michael Chen',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
-    },
-    likes: 18,
-    isLiked: true,
-    isWishlisted: true,
-  },
-  {
-    id: '6',
-    title: 'Organic Skincare Set',
-    description: 'Natural skincare products made with organic ingredients.',
-    price: 92.00,
-    currency: 'USD',
-    image: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400',
-    seller: {
-      id: '6',
-      name: 'Natural Beauty',
-      avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100',
-    },
-    likes: 28,
-    isLiked: true,
-    isWishlisted: true,
-  },
-];
+import { likeService } from '@/services/like';
+import { Loader } from '@/components/ui/Loader';
+import { toast } from 'sonner';
+import type { Artwork } from '@/services/artwork';
 
 const WishlistPage = () => {
-  const [wishlistItems, setWishlistItems] = useState(mockWishlistItems);
+  const [wishlistItems, setWishlistItems] = useState<Artwork[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLikedArtworks = async () => {
+      try {
+        const response = await likeService.getLikedArtworks();
+        setWishlistItems(response.artworks);
+      } catch (error) {
+        toast.error('Failed to fetch wishlist items');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLikedArtworks();
+  }, []);
 
   const handleLike = (itemId: string) => {
+    // Remove from wishlist when unliked
     setWishlistItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId
-          ? {
-              ...item,
-              isLiked: !item.isLiked,
-              likes: item.isLiked ? item.likes - 1 : item.likes + 1,
-            }
-          : item
-      )
+      prevItems.filter(item => item._id !== itemId)
     );
   };
 
   const handleWishlist = (itemId: string) => {
     setWishlistItems(prevItems =>
-      prevItems.filter(item => item.id !== itemId)
+      prevItems.filter(item => item._id !== itemId)
     );
   };
 
   const filteredItems = wishlistItems.filter(item =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.seller.name.toLowerCase().includes(searchQuery.toLowerCase())
+    item.artistId.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
 
   if (wishlistItems.length === 0) {
     return (
@@ -136,14 +121,15 @@ const WishlistPage = () => {
 
         {/* Wishlist Items */}
         {filteredItems.length > 0 ? (
-          <div className={viewMode === 'grid' ? 'masonry-grid' : 'space-y-4'}>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'space-y-4'}>
             {filteredItems.map((item) => (
-              <div key={item.id} className={viewMode === 'grid' ? 'masonry-item' : ''}>
+              <div key={item._id}>
                 <ItemCard
                   item={item}
                   onLike={handleLike}
                   onWishlist={handleWishlist}
                   variant={viewMode}
+                  isLiked={true}
                 />
               </div>
             ))}

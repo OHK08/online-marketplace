@@ -6,8 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Heart, Share, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { artworkService } from '@/services/artwork';
+import { likeService } from '@/services/like';
 import { Loader } from '@/components/ui/Loader';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useCopyLink } from '@/hooks/useCopyLink';
 
 export const ArtworkDetailPage = () => {
@@ -16,29 +17,30 @@ export const ArtworkDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
-  const { toast } = useToast();
+  const [likeCount, setLikeCount] = useState(0);
   const { copyLink } = useCopyLink();
 
   useEffect(() => {
     if (id) {
-      fetchArtwork();
+      fetchArtworkAndLikeStatus();
     }
   }, [id]);
 
-  const fetchArtwork = async () => {
+  const fetchArtworkAndLikeStatus = async () => {
     try {
-      const response = await artworkService.getArtworkById(id!);
-      if (response.success && response.artwork) {
-        setArtwork(response.artwork);
+      const [artworkResponse, likedResponse] = await Promise.all([
+        artworkService.getArtworkById(id!),
+        likeService.getLikedArtworks()
+      ]);
+      
+      if (artworkResponse.success && artworkResponse.artwork) {
+        setArtwork(artworkResponse.artwork);
+        setLikeCount(artworkResponse.artwork.likeCount || 0);
+        setIsLiked(likedResponse.artworks.some(a => a._id === id));
       }
     } catch (error) {
       console.error('Error fetching artwork:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to load artwork details',
-      });
+      toast.error('Failed to load artwork details');
     } finally {
       setLoading(false);
     }
@@ -58,18 +60,21 @@ export const ArtworkDetailPage = () => {
     copyLink(window.location.href, artwork?.title);
   };
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    toast({
-      description: isLiked ? 'Removed from likes' : 'Added to likes',
-    });
+  const handleLike = async () => {
+    if (!artwork) return;
+    
+    try {
+      await likeService.toggleLike(artwork._id);
+      setIsLiked(!isLiked);
+      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+      toast.success(isLiked ? 'Removed from wishlist' : 'Added to wishlist');
+    } catch (error) {
+      toast.error('Failed to update wishlist');
+    }
   };
 
   const handleWishlist = () => {
-    setIsWishlisted(!isWishlisted);
-    toast({
-      description: isWishlisted ? 'Removed from wishlist' : 'Added to wishlist',
-    });
+    handleLike(); // Same as like functionality
   };
 
   if (loading) {
@@ -162,20 +167,11 @@ export const ArtworkDetailPage = () => {
                 className={isLiked ? 'text-red-500 border-red-500' : ''}
               >
                 <Heart className={`w-4 h-4 mr-2 ${isLiked ? 'fill-current' : ''}`} />
-                {isLiked ? 'Liked' : 'Like'}
+                {isLiked ? 'Liked' : 'Like'} ({likeCount})
               </Button>
               <Button variant="outline" size="sm" onClick={handleShare}>
                 <Share className="w-4 h-4 mr-2" />
                 Share
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleWishlist}
-                className={isWishlisted ? 'text-primary border-primary' : ''}
-              >
-                <Heart className={`w-4 h-4 mr-2 ${isWishlisted ? 'fill-current' : ''}`} />
-                {isWishlisted ? 'Wishlisted' : 'Wishlist'}
               </Button>
             </div>
 

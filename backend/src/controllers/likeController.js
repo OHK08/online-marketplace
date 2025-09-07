@@ -46,10 +46,15 @@ exports.likeArtwork = async (req, res) => {
 exports.getLikedArtworks = async (req, res) => {
   try {
     const userId = req.user.id;
-
-    // ✅ Now we can fetch directly from User
+    
     const user = await User.findById(userId)
-      .populate("likes") // populate artworks liked
+      .populate({
+        path: "likes",
+        populate: {
+          path: "artistId",
+          select: "name avatarUrl" // to get artist details
+        }
+      })
       .select("likes");
 
     if (!user) {

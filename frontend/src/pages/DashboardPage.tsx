@@ -3,87 +3,53 @@ import { StoryBar } from '@/components/ui/StoryBar';
 import { ItemCard } from '@/components/ui/ItemCard';
 import { Loader } from '@/components/ui/Loader';
 import { artworkService, type Artwork } from '@/services/artwork';
-import { useToast } from '@/hooks/use-toast';
-
-interface ItemCardData {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  currency: string;
-  image: string;
-  seller: { id: string; name: string; avatar: string; };
-  likes: number;
-  isLiked: boolean;
-  isWishlisted: boolean;
-}
+import { likeService } from '@/services/like';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 const DashboardPage = () => {
-  const [items, setItems] = useState<ItemCardData[]>([]);
+  const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const [likedArtworks, setLikedArtworks] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
 
   useEffect(() => {
-    const loadArtworks = async () => {
+    const fetchData = async () => {
       try {
-        const response = await artworkService.getAllArtworks();
-        if (response.success && response.artworks) {
-          // Transform artwork data to match ItemCard interface
-          const transformedItems: ItemCardData[] = response.artworks.map((artwork: Artwork) => ({
-            id: artwork._id,
-            title: artwork.title,
-            description: artwork.description || '',
-            price: artwork.price,
-            currency: artwork.currency,
-            image: artwork.media[0]?.url || '/placeholder.svg',
-            seller: {
-              id: artwork.artistId._id,
-              name: artwork.artistId.name,
-              avatar: artwork.artistId.avatarUrl || '/placeholder.svg',
-            },
-            likes: artwork.likeCount,
-            isLiked: false,
-            isWishlisted: false,
-          }));
-          setItems(transformedItems);
-        }
+        const [artworksResponse, likedResponse] = await Promise.all([
+          artworkService.getAllArtworks(),
+          likeService.getLikedArtworks()
+        ]);
+        
+        setArtworks(artworksResponse.artworks);
+        setLikedArtworks(new Set(likedResponse.artworks.map(artwork => artwork._id)));
       } catch (error) {
-        console.error('Error loading artworks:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load artworks. Please try again.',
-        });
+        console.error('Error loading data:', error);
+        toast.error('Failed to load artworks');
       } finally {
         setLoading(false);
       }
     };
 
-    loadArtworks();
-  }, [toast]);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const handleLike = (itemId: string) => {
-    setItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId
-          ? {
-              ...item,
-              isLiked: !item.isLiked,
-              likes: item.isLiked ? item.likes - 1 : item.likes + 1,
-            }
-          : item
-      )
-    );
+    setLikedArtworks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
   };
 
   const handleWishlist = (itemId: string) => {
-    setItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId
-          ? { ...item, isWishlisted: !item.isWishlisted }
-          : item
-      )
-    );
+    handleLike(itemId);
   };
 
   if (loading) {
@@ -106,16 +72,16 @@ const DashboardPage = () => {
           </p>
         </div>
 
-        {/* Masonry Grid */}
-        <div className="masonry-grid">
-          {items.map((item) => (
-            <div key={item.id} className="masonry-item">
-              <ItemCard
-                item={item}
-                onLike={handleLike}
-                onWishlist={handleWishlist}
-              />
-            </div>
+        {/* Grid Layout - 4 items per row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {artworks.map((artwork) => (
+            <ItemCard
+              key={artwork._id}
+              item={artwork}
+              onLike={handleLike}
+              onWishlist={handleWishlist}
+              isLiked={likedArtworks.has(artwork._id)}
+            />
           ))}
         </div>
       </div>
