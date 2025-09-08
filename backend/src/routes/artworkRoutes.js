@@ -27,4 +27,7 @@ router.get("/me/my-artworks", authMiddleware, artworkController.myArtworks);
 // edit artwork
 router.put("/:id", authMiddleware, artworkController.updateArtwork);
 
+// Restock artwork (seller only)
+router.patch("/:id/restock", authMiddleware, artworkController.restockArtwork);
+
 module.exports = router;

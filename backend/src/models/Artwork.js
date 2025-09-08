@@ -52,7 +52,7 @@ const ArtworkSchema = new Schema({
     },
     status: { 
         type: String, 
-        enum: ['draft','published','removed'], 
+        enum: ['draft','published','removed','out_of_stock'], 
         default: 'draft' 
     },
     likeCount: { 

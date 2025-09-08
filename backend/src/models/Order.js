@@ -50,7 +50,7 @@ const OrderSchema = new Schema({
 
     status: { 
         type: String, 
-        enum: ['created','pending','paid','failed','shipped','delivered','cancelled'], 
+        enum: ['created','pending','paid','failed','shipped','out_for_delivery','delivered','cancelled'], 
         default: 'created' 
     }
 }, { timestamps: true });

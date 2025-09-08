@@ -207,3 +207,53 @@ exports.updateArtwork = async (req, res) => {
     });
   }
 };
+
+
+// ------------------ RESTOCK ARTWORK ------------------
+exports.restockArtwork = async (req, res) => {
+  try {
+    const { id } = req.params; // artwork ID
+    const { quantity } = req.body; // new quantity to add
+
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quantity must be greater than 0",
+      });
+    }
+
+    const artwork = await Artwork.findById(id);
+
+    if (!artwork) {
+      return res.status(404).json({ success: false, message: "Artwork not found" });
+    }
+
+    // Only the seller/artist can restock
+    if (artwork.artistId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    // increase quantity
+    artwork.quantity += Number(quantity);
+
+    // if previously out_of_stock or removed, publish it again
+    if (artwork.status === "out_of_stock" || artwork.status === "removed") {
+      artwork.status = "published";
+    }
+
+    await artwork.save();
+
+    res.json({
+      success: true,
+      message: "Artwork restocked successfully",
+      artwork,
+    });
+  } catch (err) {
+    console.error("Error restocking artwork:", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while restocking artwork",
+      error: err.message,
+    });
+  }
+};
