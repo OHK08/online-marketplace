@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit, Eye, Trash } from 'lucide-react';
+import { Edit, Trash, Package } from 'lucide-react';
 import { artworkService, type Artwork } from '@/services/artwork';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
@@ -16,6 +16,8 @@ export const InventoryTable = () => {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingArtwork, setEditingArtwork] = useState<Artwork | null>(null);
+  const [restockingArtwork, setRestockingArtwork] = useState<Artwork | null>(null);
+  const [restockQuantity, setRestockQuantity] = useState(1);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -97,7 +99,7 @@ export const InventoryTable = () => {
       // Update local state
       setArtworks(artworks.map(artwork => 
         artwork._id === editingArtwork._id 
-          ? { ...artwork, ...editForm, status: editForm.status as 'draft' | 'published' | 'removed' }
+          ? { ...artwork, ...editForm, status: editForm.status as 'draft' | 'published' | 'removed' | 'out_of_stock' }
           : artwork
       ));
       
@@ -112,6 +114,37 @@ export const InventoryTable = () => {
         variant: 'destructive',
         title: 'Error', 
         description: 'Failed to update artwork.',
+      });
+    }
+  };
+
+  const handleRestock = async () => {
+    if (!restockingArtwork || restockQuantity <= 0) return;
+    
+    try {
+      const response = await artworkService.restockArtwork(restockingArtwork._id, restockQuantity);
+      
+      if (response.success && response.artwork) {
+        // Update local state
+        setArtworks(artworks.map(artwork => 
+          artwork._id === restockingArtwork._id 
+            ? response.artwork!
+            : artwork
+        ));
+        
+        setRestockingArtwork(null);
+        setRestockQuantity(1);
+        toast({
+          title: 'Success',
+          description: 'Artwork restocked successfully.',
+        });
+      }
+    } catch (error) {
+      console.error('Error restocking artwork:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to restock artwork.',
       });
     }
   };
@@ -146,16 +179,17 @@ export const InventoryTable = () => {
               <TableCell>{getCurrencySymbol(artwork.currency)}{artwork.price}</TableCell>
               <TableCell>{artwork.quantity}</TableCell>
               <TableCell>
-                <Badge variant={artwork.status === 'published' ? 'default' : 'secondary'}>
-                  {artwork.status}
+                <Badge variant={
+                  artwork.status === 'published' ? 'default' : 
+                  artwork.status === 'out_of_stock' ? 'destructive' : 
+                  'secondary'
+                }>
+                  {artwork.status.replace('_', ' ')}
                 </Badge>
               </TableCell>
               <TableCell>{artwork.likeCount}</TableCell>
               <TableCell>
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm">
-                    <Eye className="w-4 h-4" />
-                  </Button>
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button 
@@ -238,6 +272,7 @@ export const InventoryTable = () => {
                               <SelectContent>
                                 <SelectItem value="draft">Draft</SelectItem>
                                 <SelectItem value="published">Published</SelectItem>
+                                <SelectItem value="out_of_stock">Out of Stock</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -250,6 +285,46 @@ export const InventoryTable = () => {
                       </div>
                     </DialogContent>
                   </Dialog>
+                  
+                  {artwork.status === 'out_of_stock' && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setRestockingArtwork(artwork)}
+                        >
+                          <Package className="w-4 h-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Restock Artwork</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <p className="text-sm text-muted-foreground">
+                            Current quantity: {artwork.quantity}
+                          </p>
+                          <div>
+                            <Label htmlFor="restock-quantity">Add Quantity</Label>
+                            <Input
+                              id="restock-quantity"
+                              type="number"
+                              min="1"
+                              value={restockQuantity}
+                              onChange={(e) => setRestockQuantity(parseInt(e.target.value))}
+                            />
+                          </div>
+                          <div className="flex gap-2 pt-4">
+                            <Button onClick={handleRestock} className="flex-1">
+                              Restock
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  
                   <Button 
                     variant="ghost" 
                     size="sm"

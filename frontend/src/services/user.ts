@@ -30,4 +30,9 @@ export const userService = {
     const response = await apiClient.delete('/user/delete');
     return response.data;
   },
+
+  async getUserById(userId: string): Promise<UserResponse> {
+    const response = await apiClient.get(`/users/${userId}`);
+    return response.data;
+  },
 };

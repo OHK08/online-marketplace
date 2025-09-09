@@ -16,10 +16,10 @@ interface ItemCardProps {
   isLiked?: boolean;
 }
 
-export const ItemCard: React.FC<ItemCardProps> = ({
-  item,
-  onLike,
-  onWishlist,
+export const ItemCard: React.FC<ItemCardProps> = ({ 
+  item, 
+  onLike, 
+  onWishlist, 
   variant = 'grid',
   isLiked = false
 }) => {
@@ -62,33 +62,18 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     <Card className="card-hover overflow-hidden cursor-pointer" onClick={() => window.location.href = `/artwork/${item._id}`}>
       <div className="relative">
         <img src={item.media[0]?.url || '/placeholder.svg'} alt={item.title} className="w-full h-48 object-cover" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-2 right-2 bg-background/80 hover:bg-background"
-          onClick={handleWishlist}
-        >
-          <Heart className={`w-4 h-4 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
-        </Button>
       </div>
       <CardContent className="p-4">
         <h3 className="font-semibold mb-2">{item.title}</h3>
         <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{item.description}</p>
         <div className="flex justify-between items-center mb-3">
-          <span className="text-lg font-bold">
-            {item.currency ? getCurrencySymbol(item.currency) : ''}
-            {item.price ?? 'N/A'}
-          </span>
-          <div className="flex items-center gap-2">
+          <span className="text-lg font-bold">{getCurrencySymbol(item.currency)}{item.price}</span>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); window.location.href = `/artist/${item.artistId._id}`; }}>
             <Avatar className="w-6 h-6">
-              <AvatarImage src={item.artistId?.avatarUrl || '/placeholder.svg'} />
-              <AvatarFallback>
-                {item.artistId?.name ? item.artistId.name[0] : '?'}
-              </AvatarFallback>
+              <AvatarImage src={item.artistId.avatarUrl} />
+              <AvatarFallback>{item.artistId.name[0]}</AvatarFallback>
             </Avatar>
-            <span className="text-sm text-muted-foreground">
-              {item.artistId?.name || 'Unknown Artist'}
-            </span>
+            <span className="text-sm text-muted-foreground hover:text-primary transition-colors">{item.artistId.name}</span>
           </div>
         </div>
         <div className="flex gap-2">

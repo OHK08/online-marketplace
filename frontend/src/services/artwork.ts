@@ -21,7 +21,7 @@ export interface Artwork {
   price: number;
   currency: string;
   quantity: number;
-  status: 'draft' | 'published' | 'removed';
+  status: 'draft' | 'published' | 'removed' | 'out_of_stock';
   likeCount: number;
   createdAt: string;
   updatedAt: string;
@@ -102,6 +102,16 @@ export const artworkService = {
 
   async updateArtwork(id: string, payload: UpdateArtworkPayload): Promise<ArtworkResponse> {
     const response = await apiClient.put(`/artworks/${id}`, payload);
+    return response.data;
+  },
+
+  async getArtworksByArtist(artistId: string): Promise<ArtworkResponse> {
+    const response = await apiClient.get(`/artworks/artist/${artistId}`);
+    return response.data;
+  },
+
+  async restockArtwork(id: string, quantity: number): Promise<ArtworkResponse> {
+    const response = await apiClient.patch(`/artworks/${id}/restock`, { quantity });
     return response.data;
   },
 };

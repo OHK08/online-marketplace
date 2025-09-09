@@ -16,6 +16,7 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import { ArtworkDetailPage } from '@/pages/ArtworkDetailPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { ContactPage } from '@/pages/ContactPage';
+import { ArtistPage } from '@/pages/ArtistPage';
 
 export const AppRoutes = () => {
   const { mode } = useUI();
@@ -45,6 +46,14 @@ export const AppRoutes = () => {
         element={
           <RequireAuth>
             <MainLayout><ArtworkDetailPage /></MainLayout>
+          </RequireAuth>
+        } 
+      />
+      <Route 
+        path="/artist/:artistId" 
+        element={
+          <RequireAuth>
+            <MainLayout><ArtistPage /></MainLayout>
           </RequireAuth>
         } 
       />
