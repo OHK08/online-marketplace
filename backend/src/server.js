@@ -14,6 +14,7 @@ const userRoutes = require("./routes/userRoutes");
 const artworkRoutes = require("./routes/artworkRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const likeRoutes = require("./routes/likeRoutes");
+const cartRoutes = require("./routes/cartRoutes");
 
 // Initialize app
 dotenv.config();
@@ -46,6 +47,7 @@ app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/artworks", artworkRoutes);
 app.use("/api/v1/order", orderRoutes);
 app.use("/api/v1/like", likeRoutes);
+app.use("/api/v1/cart", cartRoutes);
 
 // ------------------- Health Check -------------------
 app.get("/", (req, res) => {
