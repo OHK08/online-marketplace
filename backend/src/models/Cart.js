@@ -9,7 +9,9 @@ const CartItemSchema = new Schema({
     required: true },
   qty: { 
     type: Number, 
-    default: 1 },
+    default: 1,
+    min: 1
+  },
 }, { _id: false });
 
 const CartSchema = new Schema({
