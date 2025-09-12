@@ -8,6 +8,7 @@ import google.generativeai as genai
 from ..processors.image_processor import preprocess_image
 from ..prompts.prompt_engineering import get_story_prompt
 import logging
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -59,81 +60,46 @@ async def generate_story(image: UploadFile):
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
 
         # Step 1: Classify craft type and detect skill level
-        analysis_prompt = "Analyze this craft image: identify the craft type (e.g., pottery, basket, weaving) and estimate the skill level (beginner, intermediate, expert) based on complexity. Return as 'Craft type: [type]' and 'Skill level: [level]' on separate lines."
-        analysis_response = model.generate_content([analysis_prompt] + image_parts)
+        analysis_prompt = "Analyze this craft image: identify the craft type (e.g., pottery, basket, weaving) and estimate the skill level (beginner, intermediate, expert) based on complexity. Return ONLY a JSON object with 'craft_type' and 'skill_level'."
+        analysis_response = model.generate_content([analysis_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         analysis_text = analysis_response.text
         logger.info(f"Raw analysis: {analysis_text}")  # Log raw analysis
-        craft_type = "unknown"
-        skill_level = "unknown"
-        for line in analysis_text.split('\n'):
-            line = line.strip().lower()
-            if line.startswith("craft type:"):
-                craft_type = line.replace("craft type:", "").strip()
-            elif line.startswith("skill level:"):
-                skill_level = line.replace("skill level:", "").strip()
-        if not craft_type:
-            craft_type = "pottery"  # Default if analysis fails
+        try:
+            analysis = json.loads(analysis_text)
+            craft_type = analysis.get('craft_type', "pottery")
+            skill_level = analysis.get('skill_level', "intermediate")
+        except json.JSONDecodeError:
+            craft_type = "pottery"
             skill_level = "intermediate"
+            logger.warning("Invalid JSON from analysis - using defaults")
 
         # Dynamic prompt with detected craft type
         prompt = get_story_prompt(craft_type=craft_type, language="English", tone="warm, respectful")
 
-        # Send to Gemini with retry logic
-        max_retries = 2
-        for attempt in range(max_retries):
-            response = model.generate_content([prompt] + image_parts)
-            story_text = response.text
-            logger.info(f"Raw story (attempt {attempt + 1}): {story_text}")  # Log raw story
-            sections = {"title": "", "narrative": "", "tutorial": "", "categories": []}
-            current_section = None
-            lines = story_text.split('\n')
-            i = 0
-            while i < len(lines):
-                line = lines[i].strip()
-                if line.startswith('# Title'):
-                    sections['title'] = line.replace('# Title', '').replace(':', '').strip() or f"Story of {craft_type}"
-                    i += 1
-                    while i < len(lines) and not lines[i].strip().startswith('#'):
-                        sections['title'] += ' ' + lines[i].strip()
-                        i += 1
-                elif line.startswith('# Narrative'):
-                    current_section = 'narrative'
-                    sections['narrative'] = line.replace('# Narrative', '').replace(':', '').strip() or f"This {craft_type} is crafted with care by artisans."
-                    i += 1
-                    while i < len(lines) and not lines[i].strip().startswith('#'):
-                        sections['narrative'] += ' ' + lines[i].strip()
-                        i += 1
-                elif line.startswith('# Tutorial'):
-                    current_section = 'tutorial'
-                    sections['tutorial'] = line.replace('# Tutorial', '').replace(':', '').strip() or f"1. Gather {craft_type} materials. 2. Craft with care. 3. Finish the piece."
-                    i += 1
-                    while i < len(lines) and not lines[i].strip().startswith('#'):
-                        sections['tutorial'] += ' ' + lines[i].strip()
-                        i += 1
-                elif line.startswith('# Categories'):
-                    sections['categories'] = [cat.strip() for cat in line.replace('# Categories', '').replace(':', '').strip().split(',') if cat.strip()] or [f"{craft_type.lower()}_craft", "handmade", "traditional"]
-                    i += 1
-                else:
-                    i += 1
-
-            # Minimal check
-            if sections['title'] and sections['narrative'] and sections['tutorial'] and sections['categories']:
-                logger.info(f"Success on attempt {attempt + 1}: {sections}")
-                break
-            logger.warning(f"Attempt {attempt + 1} failed: Incomplete story. Sections: {sections}")
-        else:
-            logger.error("All retries failed - using minimal fallback")
-            sections = {
-                "title": f"Minimal {craft_type} Story",
-                "narrative": f"This {craft_type} craft reflects traditional techniques. Details unavailable due to image issues.",
-                "tutorial": f"1. Prepare {craft_type} materials. 2. Craft with care. 3. Complete.",
-                "categories": [f"{craft_type.lower()}_craft", "handmade", "traditional"]
-            }
-
-        # Add classification and skill level
-        sections["craft_type"] = craft_type
-        sections["skill_level"] = skill_level
-
+        # Send to Gemini with JSON config
+        response = model.generate_content([prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        story_text = response.text
+        logger.info(f"Raw story: {story_text}")  # Log raw story
+        try:
+            sections = json.loads(story_text)
+            # Check completeness
+            if all(key in sections for key in ['title', 'narrative', 'tutorial', 'categories']):
+                sections['craft_type'] = craft_type
+                sections['skill_level'] = skill_level
+                return sections
+            else:
+                logger.warning("Incomplete JSON from Gemini - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from Gemini - using fallback")
+        # Fallback if JSON fails
+        sections = {
+            "title": f"Story of {craft_type}",
+            "narrative": f"This {craft_type} craft is made with skill. The artisan uses traditional methods to create beautiful pieces.",
+            "tutorial": f"1. Prepare materials for {craft_type}. 2. Shape and build. 3. Finish and dry.",
+            "categories": [f"{craft_type.lower()}_craft", "handmade", "traditional"],
+            "craft_type": craft_type,
+            "skill_level": skill_level
+        }
         return sections
     except ValueError as ve:
         logger.error(f"Image processing error: {str(ve)}")
