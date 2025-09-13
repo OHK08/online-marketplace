@@ -59,8 +59,8 @@ async def generate_story(image: UploadFile):
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
 
-        # Step 1: Classify craft type and detect skill level
-        analysis_prompt = "Analyze this craft image: identify the craft type (e.g., pottery, basket, weaving) and estimate the skill level (beginner, intermediate, expert) based on complexity. Return ONLY a JSON object with 'craft_type' and 'skill_level'."
+        # Step 1: Classify craft type, detect skill level, and craft technique
+        analysis_prompt = "Analyze this craft image: identify the craft type (e.g., pottery, basket, weaving), estimate the skill level (beginner, intermediate, expert), and describe the main craft technique (e.g., wheel-throwing, coiling, weaving). Return ONLY a JSON object with 'craft_type', 'skill_level', and 'craft_technique'."
         analysis_response = model.generate_content([analysis_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         analysis_text = analysis_response.text
         logger.info(f"Raw analysis: {analysis_text}")  # Log raw analysis
@@ -68,9 +68,11 @@ async def generate_story(image: UploadFile):
             analysis = json.loads(analysis_text)
             craft_type = analysis.get('craft_type', "pottery")
             skill_level = analysis.get('skill_level', "intermediate")
+            craft_technique = analysis.get('craft_technique', "hand-building")
         except json.JSONDecodeError:
             craft_type = "pottery"
             skill_level = "intermediate"
+            craft_technique = "hand-building"
             logger.warning("Invalid JSON from analysis - using defaults")
 
         # Dynamic prompt with detected craft type
@@ -86,6 +88,7 @@ async def generate_story(image: UploadFile):
             if all(key in sections for key in ['title', 'narrative', 'tutorial', 'categories']):
                 sections['craft_type'] = craft_type
                 sections['skill_level'] = skill_level
+                sections['craft_technique'] = craft_technique
                 return sections
             else:
                 logger.warning("Incomplete JSON from Gemini - using fallback")
@@ -98,9 +101,51 @@ async def generate_story(image: UploadFile):
             "tutorial": f"1. Prepare materials for {craft_type}. 2. Shape and build. 3. Finish and dry.",
             "categories": [f"{craft_type.lower()}_craft", "handmade", "traditional"],
             "craft_type": craft_type,
-            "skill_level": skill_level
+            "skill_level": skill_level,
+            "craft_technique": craft_technique
         }
         return sections
+
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/similar_crafts")
+async def similar_crafts(image: UploadFile):
+    try:
+        # Read image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail=f"No image data provided for file: {image.filename}")
+
+        # Preprocess image
+        processed_bytes = preprocess_image(image_bytes)
+
+        # Configure Gemini model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Convert to base64 for Gemini
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Analyze for similarity features
+        similarity_prompt = "Analyze this craft image and suggest 3 similar crafts based on visual features (e.g., shape, texture, color). Return ONLY a JSON object with 'similar_crafts' as a list of 3 strings."
+        similarity_response = model.generate_content([similarity_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        similarity_text = similarity_response.text
+        logger.info(f"Raw similarity: {similarity_text}")
+        try:
+            similarity = json.loads(similarity_text)
+            if 'similar_crafts' in similarity and len(similarity['similar_crafts']) == 3:
+                return similarity
+            else:
+                logger.warning("Incomplete similarity JSON - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from similarity - using fallback")
+        return {"similar_crafts": ["similar pottery jar", "handwoven basket", "clay vase"]}
+
     except ValueError as ve:
         logger.error(f"Image processing error: {str(ve)}")
         raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
