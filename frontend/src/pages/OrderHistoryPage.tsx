@@ -1,93 +1,69 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Package, Search, Eye, MessageCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Loader } from '@/components/ui/Loader';
+import { orderService, Order } from '@/services/order'; // 👈 Import the correct Order type
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
-interface Order {
-  id: string;
-  item: {
-    title: string;
-    image: string;
-    price: number;
-  };
-  seller: {
-    name: string;
-    avatar: string;
-  };
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  orderDate: string;
-  deliveryDate?: string;
-  total: number;
-}
-
-const mockOrders: Order[] = [
-  {
-    id: 'ORD-001',
-    item: {
-      title: 'Handcrafted Ceramic Vase',
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150',
-      price: 89.99,
-    },
-    seller: {
-      name: 'Sarah Johnson',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b714?w=100',
-    },
-    status: 'delivered',
-    orderDate: '2024-01-15',
-    deliveryDate: '2024-01-20',
-    total: 89.99,
-  },
-  {
-    id: 'ORD-002',
-    item: {
-      title: 'Vintage Leather Journal',
-      image: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=150',
-      price: 45.00,
-    },
-    seller: {
-      name: 'Michael Chen',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
-    },
-    status: 'shipped',
-    orderDate: '2024-01-18',
-    total: 45.00,
-  },
-  {
-    id: 'ORD-003',
-    item: {
-      title: 'Artisan Coffee Beans',
-      image: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=150',
-      price: 24.99,
-    },
-    seller: {
-      name: 'Coffee Roasters Co.',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-    },
-    status: 'processing',
-    orderDate: '2024-01-20',
-    total: 24.99,
-  },
-];
-
 const OrderHistoryPage = () => {
-  const [orders] = useState<Order[]>(mockOrders);
+  // Use the imported Order type directly
+  const [orders, setOrders] = useState<Order[]>([]); 
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { toast } = useToast();
 
-  const getStatusColor = (status: Order['status']) => {
+  useEffect(() => {
+    loadBuyerOrders();
+  }, []);
+
+  const loadBuyerOrders = async () => {
+    try {
+      const response = await orderService.getMyOrders();
+      if (response.success && response.orders) {
+        setOrders(response.orders);
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load your orders.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCurrencySymbol = (currency: string) => {
+    const symbols: { [key: string]: string } = {
+      'INR': '₹',
+      'USD': '$',
+      'EUR': '€',
+      'GBP': '£'
+    };
+    return symbols[currency] || currency;
+  };
+
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
+      case 'created':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'processing':
+      case 'paid':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
       case 'shipped':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'out_for_delivery':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
       case 'delivered':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       case 'cancelled':
@@ -97,13 +73,30 @@ const OrderHistoryPage = () => {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'created': return 'Order Pending';
+      case 'paid': return 'Payment Confirmed';
+      case 'shipped': return 'Shipped';
+      case 'out_for_delivery': return 'Out for Delivery';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      default: return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.seller.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = order.items.some(item => 
+      item.titleCopy.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.sellerId?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    ) || order._id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  if (loading) {
+    return <Loader text="Loading your orders..." />;
+  }
 
   if (orders.length === 0) {
     return (
@@ -153,9 +146,10 @@ const OrderHistoryPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Orders</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="created">Order Pending</SelectItem>
+                  <SelectItem value="paid">Payment Confirmed</SelectItem>
                   <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
@@ -167,66 +161,150 @@ const OrderHistoryPage = () => {
         {/* Orders List */}
         <div className="space-y-4">
           {filteredOrders.map((order) => (
-            <Card key={order.id} className="card-hover">
+            <Card key={order._id} className="card-hover">
               <CardContent className="pt-6">
                 <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Order Image */}
+                  {/* Order Image(s) */}
                   <div className="flex-shrink-0">
-                    <img
-                      src={order.item.image}
-                      alt={order.item.title}
-                      className="w-24 h-24 object-cover rounded-lg"
-                    />
+                    {order.items.length === 1 && order.items[0].artworkId.media && order.items[0].artworkId.media.length > 0 ? (
+                      <img
+                        src={order.items[0].artworkId.media[0].url}
+                        alt={order.items[0].titleCopy}
+                        className="w-24 h-24 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 bg-muted rounded-lg flex items-center justify-center">
+                        <Package className="w-8 h-8 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground ml-1">
+                          {order.items.length}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Order Details */}
                   <div className="flex-1 space-y-2">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                      <h3 className="font-semibold text-lg">{order.item.title}</h3>
+                      <div>
+                        <h3 className="font-semibold text-lg">
+                          {order.items.length === 1 
+                            ? order.items[0].titleCopy
+                            : `${order.items.length} items`
+                          }
+                        </h3>
+                        {order.items.length > 1 && (
+                          <div className="text-sm text-muted-foreground">
+                            {order.items.map((item, idx) => item.titleCopy).join(', ')}
+                          </div>
+                        )}
+                      </div>
                       <Badge className={getStatusColor(order.status)}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        {getStatusLabel(order.status)}
                       </Badge>
                     </div>
                     
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>Order #{order.id}</span>
+                      <span>Order #{order._id.slice(-8).toUpperCase()}</span>
                       <span>•</span>
-                      <span>Ordered {format(new Date(order.orderDate), 'MMM dd, yyyy')}</span>
-                      {order.deliveryDate && (
+                      <span>Ordered {format(new Date(order.createdAt), 'MMM dd, yyyy')}</span>
+                    </div>
+
+                    {/* Seller Info */}
+                    <div className="flex items-center gap-3">
+                      {order.items[0].sellerId && (
                         <>
-                          <span>•</span>
-                          <span>Delivered {format(new Date(order.deliveryDate), 'MMM dd, yyyy')}</span>
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={order.items[0].sellerId.avatarUrl} />
+                            <AvatarFallback className="text-xs">
+                              {order.items[0].sellerId.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm text-muted-foreground">
+                            Sold by {order.items[0].sellerId.name}
+                          </span>
                         </>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={order.seller.avatar} alt={order.seller.name} />
-                        <AvatarFallback className="text-xs">
-                          {order.seller.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm text-muted-foreground">
-                        Sold by {order.seller.name}
-                      </span>
-                    </div>
-
                     <div className="text-lg font-semibold">
-                      ${order.total.toFixed(2)}
+                      {getCurrencySymbol(order.currency)}{order.total.toFixed(2)}
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex flex-row lg:flex-col gap-2">
-                    <Button variant="outline" size="sm" className="flex items-center gap-2">
-                      <Eye className="w-4 h-4" />
-                      View Details
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex items-center gap-2">
-                      <MessageCircle className="w-4 h-4" />
-                      Contact Seller
-                    </Button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center gap-2"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Details
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Order Details</DialogTitle>
+                        </DialogHeader>
+                        {selectedOrder && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <h4 className="font-semibold">Order Information</h4>
+                                <p className="text-sm">Order ID: {selectedOrder._id}</p>
+                                <p className="text-sm">Status: <Badge className={getStatusColor(selectedOrder.status)}>{getStatusLabel(selectedOrder.status)}</Badge></p>
+                                <p className="text-sm">Date: {format(new Date(selectedOrder.createdAt), 'MMM dd, yyyy HH:mm')}</p>
+                              </div>
+                              <div>
+                                <h4 className="font-semibold">Payment Information</h4>
+                                <p className="text-sm">Total: {getCurrencySymbol(selectedOrder.currency)}{selectedOrder.total.toFixed(2)}</p>
+                                <p className="text-sm">Currency: {selectedOrder.currency}</p>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-2">Items Ordered</h4>
+                              <div className="space-y-2">
+                                {selectedOrder.items.map((item, index) => (
+                                  <div key={index} className="flex justify-between items-center p-3 bg-muted rounded">
+                                    <div className="flex items-center gap-3">
+                                      <img
+                                        src={item.artworkId.media && item.artworkId.media.length > 0 ? item.artworkId.media[0].url : '/placeholder.svg'}
+                                        alt={item.titleCopy}
+                                        className="w-12 h-12 object-cover rounded"
+                                      />
+                                      <div>
+                                        <p className="font-medium">{item.titleCopy}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Quantity: {item.qty}
+                                          {item.sellerId && ` • Sold by ${item.sellerId.name}`}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-medium">
+                                        {getCurrencySymbol(selectedOrder.currency)}{(item.unitPrice).toFixed(2)} each
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Subtotal: {getCurrencySymbol(selectedOrder.currency)}{(item.unitPrice * item.qty).toFixed(2)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-4 pt-4 border-t">
+                                <div className="flex justify-between items-center font-semibold">
+                                  <span>Order Total:</span>
+                                  <span>{getCurrencySymbol(selectedOrder.currency)}{selectedOrder.total.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </CardContent>

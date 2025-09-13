@@ -22,9 +22,9 @@ export const InventoryTable = () => {
     title: '',
     description: '',
     price: 0,
-    currency: 'INR',
+    currency: '',
     quantity: 1,
-    status: 'draft'
+    status: 'draft' as 'draft' | 'published' | 'out_of_stock'
   });
   const { toast } = useToast();
 
@@ -86,7 +86,7 @@ export const InventoryTable = () => {
       price: artwork.price,
       currency: artwork.currency,
       quantity: artwork.quantity,
-      status: artwork.status
+      status: artwork.quantity === 0 ? 'out_of_stock' : artwork.status
     });
   };
 
@@ -94,26 +94,34 @@ export const InventoryTable = () => {
     if (!editingArtwork) return;
     
     try {
-      await artworkService.updateArtwork(editingArtwork._id, editForm);
+      const updatedForm = {
+        ...editForm,
+        quantity: parseInt(String(editForm.quantity)),
+        price: parseFloat(String(editForm.price)),
+        status: editForm.quantity === 0 ? 'out_of_stock' : editForm.status
+      };
+
+      const response = await artworkService.updateArtwork(editingArtwork._id, updatedForm);
       
-      // Update local state
-      setArtworks(artworks.map(artwork => 
-        artwork._id === editingArtwork._id 
-          ? { ...artwork, ...editForm, status: editForm.status as 'draft' | 'published' | 'removed' | 'out_of_stock' }
-          : artwork
-      ));
-      
-      setEditingArtwork(null);
-      toast({
-        title: 'Success',
-        description: 'Artwork updated successfully.',
-      });
+      if (response.success && response.artwork) {
+        setArtworks(artworks.map(artwork => 
+          artwork._id === editingArtwork._id 
+            ? response.artwork!
+            : artwork
+        ));
+        
+        setEditingArtwork(null);
+        toast({
+          title: 'Success',
+          description: 'Artwork updated successfully.',
+        });
+      }
     } catch (error) {
       console.error('Error updating artwork:', error);
       toast({
         variant: 'destructive',
         title: 'Error', 
-        description: 'Failed to update artwork.',
+        description: 'Failed to update artwork. Only draft artworks can be edited.',
       });
     }
   };
@@ -125,7 +133,6 @@ export const InventoryTable = () => {
       const response = await artworkService.restockArtwork(restockingArtwork._id, restockQuantity);
       
       if (response.success && response.artwork) {
-        // Update local state
         setArtworks(artworks.map(artwork => 
           artwork._id === restockingArtwork._id 
             ? response.artwork!
@@ -195,7 +202,7 @@ export const InventoryTable = () => {
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        disabled={artwork.status === 'published'}
+                        disabled={artwork.status !== 'draft'}
                         onClick={() => handleEdit(artwork)}
                       >
                         <Edit className="w-4 h-4" />
@@ -229,25 +236,17 @@ export const InventoryTable = () => {
                               id="price"
                               type="number"
                               value={editForm.price}
-                              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value)})}
+                              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value) || 0})}
                             />
                           </div>
                           <div>
                             <Label htmlFor="currency">Currency</Label>
-                            <Select 
-                              value={editForm.currency} 
-                              onValueChange={(value) => setEditForm({...editForm, currency: value})}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="INR">₹ INR</SelectItem>
-                                <SelectItem value="USD">$ USD</SelectItem>
-                                <SelectItem value="EUR">€ EUR</SelectItem>
-                                <SelectItem value="GBP">£ GBP</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <Input
+                              id="currency"
+                              value={editForm.currency}
+                              onChange={(e) => setEditForm({...editForm, currency: e.target.value})}
+                              placeholder="Enter currency code (e.g., USD, EUR)"
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -256,14 +255,15 @@ export const InventoryTable = () => {
                             <Input
                               id="quantity"
                               type="number"
+                              min="0"
                               value={editForm.quantity}
-                              onChange={(e) => setEditForm({...editForm, quantity: parseInt(e.target.value)})}
+                              onChange={(e) => setEditForm({...editForm, quantity: parseInt(e.target.value) || 0})}
                             />
                           </div>
                           <div>
                             <Label htmlFor="status">Status</Label>
                             <Select 
-                              value={editForm.status} 
+                              value={editForm.quantity === 0 ? 'out_of_stock' : editForm.status} 
                               onValueChange={(value) => setEditForm({...editForm, status: value})}
                             >
                               <SelectTrigger>
@@ -312,7 +312,7 @@ export const InventoryTable = () => {
                               type="number"
                               min="1"
                               value={restockQuantity}
-                              onChange={(e) => setRestockQuantity(parseInt(e.target.value))}
+                              onChange={(e) => setRestockQuantity(parseInt(e.target.value) || 1)}
                             />
                           </div>
                           <div className="flex gap-2 pt-4">

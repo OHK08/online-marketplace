@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Menu, User, LogOut, Package, Heart, ShoppingBag } from 'lucide-react';
+import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,12 +17,40 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
+import { cartService } from '@/services/cart';
+import { toast } from 'sonner';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
   const { mode, setMode } = useUI();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [cartItemCount, setCartItemCount] = useState(0);
+
+  // Fetch cart item count on mount and when user changes
+  useEffect(() => {
+    if (user) {
+      fetchCartItemCount();
+    } else {
+      setCartItemCount(0); // Reset cart count for unauthenticated users
+    }
+  }, [user]);
+
+  const fetchCartItemCount = async () => {
+    try {
+      const response = await cartService.getCart();
+      if (response.success && response.cart) {
+        const itemCount = response.cart.items.reduce((sum: number, item: any) => sum + item.qty, 0);
+        setCartItemCount(itemCount);
+      } else {
+        setCartItemCount(0);
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+      toast.error('Failed to load cart data');
+      setCartItemCount(0);
+    }
+  };
 
   // Handle CMD/CTRL + K for search focus
   useEffect(() => {
@@ -53,7 +81,6 @@ export const Navbar = () => {
   const toggleMode = () => {
     const newMode = mode === 'customer' ? 'seller' : 'customer';
     setMode(newMode);
-    // Navigate to dashboard which will show the appropriate view based on mode
     navigate('/dashboard');
   };
 
@@ -71,13 +98,6 @@ export const Navbar = () => {
               onCheckedChange={toggleMode}
             />
           </div>
-          
-          <Button variant="ghost" size="icon" className="relative">
-            <ShoppingCart className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
-              0
-            </span>
-          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -107,6 +127,10 @@ export const Navbar = () => {
               <DropdownMenuItem onClick={() => navigate('/wishlist')}>
                 <Heart className="mr-2 h-4 w-4" />
                 <span>Wishlist</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/cart')}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                <span>Cart {cartItemCount > 0 && `(${cartItemCount})`}</span>
               </DropdownMenuItem>
               {mode === 'seller' && (
                 <DropdownMenuItem onClick={() => navigate('/seller')}>
@@ -168,9 +192,6 @@ export const Navbar = () => {
           <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
             Explore
           </a>
-          <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-            Categories  
-          </a>
           <a href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
             About
           </a>
@@ -205,7 +226,7 @@ export const Navbar = () => {
                     className="w-full pl-10 pr-4"
                   />
                 </form>
-                
+
                 <NavContent />
               </div>
             </SheetContent>

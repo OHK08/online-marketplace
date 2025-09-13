@@ -1,15 +1,24 @@
+// @/pages/ArtworkDetailPage.tsx
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Heart, Share, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Heart, Share, ShoppingCart, ArrowLeft, CreditCard, Plus, Minus } from 'lucide-react';
 import { artworkService } from '@/services/artwork';
 import { likeService } from '@/services/like';
+import { cartService } from '@/services/cart';
 import { Loader } from '@/components/ui/Loader';
 import { toast } from 'sonner';
 import { useCopyLink } from '@/hooks/useCopyLink';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export const ArtworkDetailPage = () => {
   const { id } = useParams();
@@ -18,13 +27,31 @@ export const ArtworkDetailPage = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
   const { copyLink } = useCopyLink();
 
   useEffect(() => {
     if (id) {
       fetchArtworkAndLikeStatus();
     }
+    loadRazorpayScript();
   }, [id]);
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => {
+        resolve(true);
+      };
+      script.onerror = () => {
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  };
 
   const fetchArtworkAndLikeStatus = async () => {
     try {
@@ -73,8 +100,106 @@ export const ArtworkDetailPage = () => {
     }
   };
 
-  const handleWishlist = () => {
-    handleLike(); // Same as like functionality
+  const handleAddToCart = async () => {
+    if (!artwork) return;
+    
+    if (quantity > artwork.quantity) {
+      toast.error('Not enough stock available');
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      const response = await cartService.addToCart(artwork._id, quantity);
+      
+      if (response.success) {
+        toast.success(`Added ${quantity} item(s) to cart`);
+      }
+    } catch (error: any) {
+      console.error('Error adding to cart:', error);
+      toast.error(error.response?.data?.message || 'Failed to add to cart');
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!artwork) return;
+    
+    if (quantity > artwork.quantity) {
+      toast.error('Not enough stock available');
+      return;
+    }
+
+    try {
+      setBuyingNow(true);
+      
+      const orderResponse = await cartService.createDirectOrder([
+        { artworkId: artwork._id, qty: quantity }
+      ]);
+
+      if (!orderResponse.success || !orderResponse.razorpayOrder) {
+        toast.error('Failed to create order');
+        return;
+      }
+
+      const { razorpayOrder } = orderResponse;
+      
+      const options = {
+        // Corrected line to use import.meta.env
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'your_razorpay_key_id', 
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: 'Artisan Marketplace',
+        description: `Purchase: ${artwork.title}`,
+        order_id: razorpayOrder.id,
+        handler: async function (response: any) {
+          try {
+            const verifyResponse = await cartService.verifyDirectPayment({
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+
+            if (verifyResponse.success) {
+              toast.success('Payment successful!');
+              window.location.href = '/orders';
+            } else {
+              toast.error('Payment verification failed');
+            }
+          } catch (error) {
+            console.error('Payment verification error:', error);
+            toast.error('Payment verification failed');
+          }
+        },
+        prefill: {
+          name: 'Customer Name',
+          email: 'customer@example.com',
+          contact: '9999999999',
+        },
+        theme: {
+          color: '#3B82F6',
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+      
+      razorpay.on('payment.failed', function (response: any) {
+        toast.error('Payment failed: ' + response.error.description);
+      });
+    } catch (error: any) {
+      console.error('Buy now error:', error);
+      toast.error(error.response?.data?.message || 'Failed to process purchase');
+    } finally {
+      setBuyingNow(false);
+    }
+  };
+
+  const updateQuantity = (newQuantity: number) => {
+    if (newQuantity >= 1 && newQuantity <= artwork.quantity) {
+      setQuantity(newQuantity);
+    }
   };
 
   if (loading) {
@@ -87,6 +212,21 @@ export const ArtworkDetailPage = () => {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Artwork not found</h1>
           <p className="text-muted-foreground mb-4">The artwork you're looking for doesn't exist.</p>
+          <Button onClick={() => window.history.back()}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (artwork.status !== 'published') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Artwork not available</h1>
+          <p className="text-muted-foreground mb-4">This artwork is currently not available for purchase.</p>
           <Button onClick={() => window.history.back()}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
@@ -144,7 +284,7 @@ export const ArtworkDetailPage = () => {
             <div>
               <h1 className="text-3xl font-bold mb-2">{artwork.title}</h1>
               <p className="text-2xl font-bold text-primary">
-                {getCurrencySymbol(artwork.currency)}{artwork.price}
+                {getCurrencySymbol(artwork.currency)}{(artwork.price * quantity).toFixed(2)}
               </p>
             </div>
 
@@ -206,10 +346,96 @@ export const ArtworkDetailPage = () => {
               </Card>
             )}
 
-            <Button size="lg" className="w-full btn-gradient">
-              <ShoppingCart className="w-5 h-5 mr-2" />
-              Add to Cart
-            </Button>
+            {/* Quantity Selector */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-3">Quantity</h3>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateQuantity(quantity - 1)}
+                    disabled={quantity <= 1}
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <Input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => {
+                      const newQty = parseInt(e.target.value);
+                      if (!isNaN(newQty)) {
+                        updateQuantity(newQty);
+                      }
+                    }}
+                    className="w-20 text-center"
+                    min="1"
+                    max={artwork.quantity}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateQuantity(quantity + 1)}
+                    disabled={quantity >= artwork.quantity}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    (Max: {artwork.quantity})
+                  </span>
+                </div>
+                <div className="mt-3 text-lg font-semibold">
+                  Total: {getCurrencySymbol(artwork.currency)}{(artwork.price * quantity).toFixed(2)}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="flex-1"
+                onClick={handleAddToCart}
+                disabled={addingToCart || artwork.quantity === 0}
+              >
+                {addingToCart ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Add to Cart
+                  </>
+                )}
+              </Button>
+              <Button 
+                size="lg" 
+                className="flex-1 btn-gradient"
+                onClick={handleBuyNow}
+                disabled={buyingNow || artwork.quantity === 0}
+              >
+                {buyingNow ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Buy Now
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {artwork.quantity === 0 && (
+              <div className="text-center py-4">
+                <Badge variant="destructive">Out of Stock</Badge>
+              </div>
+            )}
           </div>
         </div>
       </div>

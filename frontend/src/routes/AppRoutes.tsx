@@ -12,6 +12,7 @@ import SellerPage from '@/pages/SellerPage';
 import ProfilePage from '@/pages/ProfilePage';
 import OrderHistoryPage from '@/pages/OrderHistoryPage';
 import WishlistPage from '@/pages/WishlistPage';
+import CartPage from '@/pages/CartPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import { ArtworkDetailPage } from '@/pages/ArtworkDetailPage';
 import { AboutPage } from '@/pages/AboutPage';
@@ -86,6 +87,14 @@ export const AppRoutes = () => {
         element={
           <RequireAuth>
             <MainLayout><WishlistPage /></MainLayout>
+          </RequireAuth>
+        } 
+      />
+      <Route 
+        path="/cart" 
+        element={
+          <RequireAuth>
+            <MainLayout><CartPage /></MainLayout>
           </RequireAuth>
         } 
       />

@@ -43,7 +43,7 @@ export interface UpdateArtworkPayload {
   price?: number;
   currency?: string;
   quantity?: number;
-  status?: string;
+  status?: 'draft' | 'published' | 'out_of_stock';
 }
 
 export interface ArtworkResponse {
@@ -80,7 +80,6 @@ export const artworkService = {
     if (payload.quantity) formData.append('quantity', payload.quantity.toString());
     if (payload.status) formData.append('status', payload.status);
     
-    // Append media files
     if (payload.media && payload.media.length > 0) {
       Array.from(payload.media).forEach((file) => {
         formData.append('media', file);
