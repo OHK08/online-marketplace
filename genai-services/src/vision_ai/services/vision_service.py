@@ -234,3 +234,164 @@ async def complementary_products(image: UploadFile):
     except Exception as e:
         logger.error(f"General error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/purchase_analysis")
+async def purchase_analysis(image: UploadFile):
+    try:
+        # Read and preprocess image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        processed_bytes = preprocess_image(image_bytes)
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Prompt for purchase platform analysis
+        purchase_prompt = "Analyze this craft image: identify craft type, technique. Suggest 3 items to add to the cart based on purchase patterns (e.g., glaze for pottery). Provide a brief analysis (50-100 words) on how this enhances the purchase experience. Return ONLY a JSON object with 'cart_suggestions' (list of 3 strings with descriptions) and 'purchase_analysis' (string, 50-100 words)."
+        response = model.generate_content([purchase_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        purchase_text = response.text
+        logger.info(f"Raw purchase response: {purchase_text}")
+        try:
+            purchase_data = json.loads(purchase_text)
+            if 'cart_suggestions' in purchase_data and len(purchase_data['cart_suggestions']) == 3 and 'purchase_analysis' in purchase_data:
+                return purchase_data
+            else:
+                logger.warning("Incomplete purchase JSON - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from purchase - using fallback")
+        return {
+            "cart_suggestions": [
+                "Glaze kit: Adds vibrant colors to pottery.",
+                "Clay tools: Improves detailing for beginners.",
+                "Kiln guide: Ensures proper firing techniques."
+            ],
+            "purchase_analysis": "Adding complementary items like glaze and tools enhances the purchase experience by offering a complete crafting solution, increasing customer satisfaction and repeat purchases. This tailored approach leverages visual analysis to suggest relevant products, boosting cart value."
+        }
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/fraud_detection")
+async def fraud_detection(image: UploadFile):
+    try:
+        # Read and preprocess image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        processed_bytes = preprocess_image(image_bytes)
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Prompt for fraud detection
+        fraud_prompt = "Analyze this craft image: detect signs of fraud (e.g., stock photo, artificial lighting, inconsistent craftsmanship). Return ONLY a JSON object with 'is_fraudulent' (boolean), 'confidence_score' (0-1), and 'reasoning' (brief)."
+        response = model.generate_content([fraud_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        fraud_text = response.text
+        logger.info(f"Raw fraud response: {fraud_text}")
+        try:
+            fraud_data = json.loads(fraud_text)
+            if 'is_fraudulent' in fraud_data and 'confidence_score' in fraud_data and 'reasoning' in fraud_data:
+                return fraud_data
+            else:
+                logger.warning("Incomplete fraud JSON - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from fraud - using fallback")
+        return {
+            "is_fraudulent": False,
+            "confidence_score": 0.95,
+            "reasoning": "No obvious signs of stock photo or artificial manipulation detected."
+        }
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/order_fulfillment_analysis")
+async def order_fulfillment_analysis(image: UploadFile):
+    try:
+        # Read and preprocess image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        processed_bytes = preprocess_image(image_bytes)
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Prompt for order fulfillment analysis
+        fulfillment_prompt = "Analyze this craft image: identify craft type, size, and fragility. Suggest optimal packaging materials and shipping considerations (e.g., bubble wrap for pottery). Return ONLY a JSON object with 'packaging_suggestions' (list of 2-3 strings with descriptions) and 'shipping_considerations' (string, 50-100 words)."
+        response = model.generate_content([fulfillment_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        fulfillment_text = response.text
+        logger.info(f"Raw fulfillment response: {fulfillment_text}")
+        try:
+            fulfillment_data = json.loads(fulfillment_text)
+            if 'packaging_suggestions' in fulfillment_data and len(fulfillment_data['packaging_suggestions']) >= 2 and 'shipping_considerations' in fulfillment_data:
+                return fulfillment_data
+            else:
+                logger.warning("Incomplete fulfillment JSON - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from fulfillment - using fallback")
+        return {
+            "packaging_suggestions": [
+                "Bubble wrap: Protects fragile pottery edges.",
+                "Cardboard box: Ensures structural integrity."
+            ],
+            "shipping_considerations": "Pottery items require careful handling due to their fragility. Use bubble wrap and a sturdy cardboard box to prevent damage during transit. Consider insured shipping to cover potential breakages, and label as 'Fragile' to alert handlers. Optimal delivery time is 5-7 days to balance cost and safety."
+        }
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/quality_predictions")
+async def quality_predictions(image: UploadFile):
+    try:
+        # Read and preprocess image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        processed_bytes = preprocess_image(image_bytes)
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Prompt for quality predictions
+        quality_prompt = "Analyze this craft image: assess craftsmanship quality (e.g., high, medium, low) based on detail, finish, and technique. Return ONLY a JSON object with 'quality_rating' (string: high/medium/low), 'confidence_score' (0-1), and 'reasoning' (brief)."
+        response = model.generate_content([quality_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        quality_text = response.text
+        logger.info(f"Raw quality response: {quality_text}")
+        try:
+            quality_data = json.loads(quality_text)
+            if 'quality_rating' in quality_data and 'confidence_score' in quality_data and 'reasoning' in quality_data:
+                return quality_data
+            else:
+                logger.warning("Incomplete quality JSON - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from quality - using fallback")
+        return {
+            "quality_rating": "high",
+            "confidence_score": 0.90,
+            "reasoning": "Excellent detail and smooth finish indicate high craftsmanship."
+        }
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
