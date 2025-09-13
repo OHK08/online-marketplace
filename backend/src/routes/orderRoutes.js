@@ -18,4 +18,7 @@ router.get("/my-sales", authMiddleware, orderController.getSales);
 // Seller: Update order status
 router.put("/:id/status", authMiddleware, orderController.updateOrderStatus);
 
+// New route for a direct "Buy Now" order
+router.post("/direct", authMiddleware, orderController.createDirectOrder);
+
 module.exports = router;

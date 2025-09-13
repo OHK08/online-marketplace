@@ -140,7 +140,10 @@ exports.createOrderFromCart = async (req, res) => {
 
       for (const item of groupItems) {
         if (item.artworkId.quantity < item.qty) {
-          return res.status(400).json({ success: false, message: `Not enough stock for ${item.artworkId.title}` });
+          return res.status(400).json({
+            success: false,
+            message: `Not enough stock for ${item.artworkId.title}`,
+          });
         }
 
         orderItems.push({
@@ -149,15 +152,19 @@ exports.createOrderFromCart = async (req, res) => {
           qty: item.qty,
           unitPrice: item.artworkId.price,
           currency: item.artworkId.currency,
+          sellerId: item.artworkId.artistId, // add sellerId here
         });
 
         total += item.artworkId.price * item.qty;
       }
 
+      const shortUserId = userId.toString().slice(-6);
+      const shortSellerId = sellerId.toString().slice(-6);
+
       const razorpayOrder = await instance.orders.create({
         amount: total * 100,
         currency: "INR",
-        receipt: `cart_${userId}_${Date.now()}_${sellerId}`,
+        receipt: `cart_${shortUserId}_${shortSellerId}_${Date.now()}`.slice(0, 39), // ensure <40
       });
 
       const order = await Order.create({
@@ -170,7 +177,7 @@ exports.createOrderFromCart = async (req, res) => {
         status: "created",
       });
 
-      created.push({ sellerId, order, razorpayOrder });
+      created.push({ orderId: order._id, sellerId, order, razorpayOrder });
     }
 
     cart.items = [];
@@ -186,7 +193,7 @@ exports.createOrderFromCart = async (req, res) => {
 // ------------------ VERIFY CART PAYMENT ------------------
 exports.verifyCartPayment = async (req, res) => {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId } = req.body;
 
     const body = razorpayOrderId + "|" + razorpayPaymentId;
     const expectedSignature = crypto
@@ -198,13 +205,20 @@ exports.verifyCartPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Payment verification failed" });
     }
 
-    const order = await Order.findOneAndUpdate(
-      { razorpayOrderId },
-      { razorpayPaymentId, razorpaySignature, status: "paid" },
-      { new: true }
-    );
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
 
-    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
+    if (order.razorpayOrderId !== razorpayOrderId) {
+      return res.status(400).json({ success: false, message: "Order ID mismatch" });
+    }
+
+    // Update order with payment details
+    order.razorpayPaymentId = razorpayPaymentId;
+    order.razorpaySignature = razorpaySignature;
+    order.status = "paid";
+    await order.save();
 
     // reduce stock
     for (const item of order.items) {
@@ -213,8 +227,8 @@ exports.verifyCartPayment = async (req, res) => {
         { $inc: { quantity: -item.qty } },
         { new: true }
       );
-      if (updatedArtwork && updatedArtwork.quantity <= 0) {
-        updatedArtwork.status = "removed";
+      if (updatedArtwork && updatedArtwork.quantity === 0) {
+        updatedArtwork.status = "out_of_stock";
         await updatedArtwork.save();
       }
     }
