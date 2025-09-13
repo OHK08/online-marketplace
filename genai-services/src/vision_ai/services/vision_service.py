@@ -132,7 +132,7 @@ async def similar_crafts(image: UploadFile):
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
 
         # Analyze for similarity features
-        similarity_prompt = "Analyze this craft image and suggest 3 similar crafts based on visual features (e.g., shape, texture, color). Return ONLY a JSON object with 'similar_crafts' as a list of 3 strings."
+        similarity_prompt = "Analyze this craft image and suggest 3 similar crafts based on visual features (e.g., shape, texture, color). Return ONLY a JSON object with 'similar_crafts' as a list of 3 strings with brief descriptions."
         similarity_response = model.generate_content([similarity_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         similarity_text = similarity_response.text
         logger.info(f"Raw similarity: {similarity_text}")
@@ -144,8 +144,90 @@ async def similar_crafts(image: UploadFile):
                 logger.warning("Incomplete similarity JSON - using fallback")
         except json.JSONDecodeError:
             logger.warning("Invalid JSON from similarity - using fallback")
-        return {"similar_crafts": ["similar pottery jar", "handwoven basket", "clay vase"]}
+        return {
+            "similar_crafts": [
+                "similar pottery jar: Smooth finish, similar shape.",
+                "handwoven basket: Natural texture, round design.",
+                "clay vase: Earthy tones, handcrafted look."
+            ]
+        }
 
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/price_suggestion")
+async def price_suggestion(image: UploadFile):
+    try:
+        # Read and preprocess image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        processed_bytes = preprocess_image(image_bytes)
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Prompt for price suggestion and market analysis
+        price_prompt = "Analyze this craft image: identify craft type, technique, skill level. Suggest a price range (₹) based on similar items (e.g., handmade pottery ₹500-2000). Provide market analysis (e.g., demand trends). Return ONLY a JSON object with 'price_range' (string, e.g., '₹1,200-1,800'), 'market_analysis' (100-150 words), 'reasoning' (brief)."
+        response = model.generate_content([price_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        price_text = response.text
+        logger.info(f"Raw price response: {price_text}")
+        try:
+            price_data = json.loads(price_text)
+            return price_data
+        except json.JSONDecodeError:
+            return {
+                "price_range": "₹1,200-1,800",
+                "market_analysis": "Handmade pottery is in high demand due to cultural trends, with prices varying by technique and skill level.",
+                "reasoning": "Based on craft type and quality."
+            }
+    except ValueError as ve:
+        logger.error(f"Image processing error: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
+    except Exception as e:
+        logger.error(f"General error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+@app.post("/complementary_products")
+async def complementary_products(image: UploadFile):
+    try:
+        # Read and preprocess image
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="No image data provided")
+        processed_bytes = preprocess_image(image_bytes)
+        base64_image = base64.b64encode(processed_bytes).decode('utf-8')
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
+
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        # Prompt for complementary analysis
+        comp_prompt = "Analyze this craft image: identify craft type, technique. Suggest 3 complementary products (e.g., glaze for pottery) with brief descriptions. Return ONLY a JSON object with 'complementary_products' as a list of 3 strings with descriptions."
+        response = model.generate_content([comp_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
+        comp_text = response.text
+        logger.info(f"Raw complementary response: {comp_text}")
+        try:
+            comp_data = json.loads(comp_text)
+            if 'complementary_products' in comp_data and len(comp_data['complementary_products']) == 3:
+                return comp_data
+            else:
+                logger.warning("Incomplete complementary JSON - using fallback")
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON from complementary - using fallback")
+        return {
+            "complementary_products": [
+                "Glaze kit for pottery: Enhances finish and color.",
+                "Weaving tools for basket: Improves precision in patterns.",
+                "Clay tools for hand-building: Essential for shaping details."
+            ]
+        }
     except ValueError as ve:
         logger.error(f"Image processing error: {str(ve)}")
         raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
