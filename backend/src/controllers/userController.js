@@ -1,4 +1,7 @@
 const User = require("../models/User");
+const mongoose = require("mongoose");
+const Artwork = require("../models/Artwork");
+const Order = require("../models/Order");
 
 // ------------------ GET PROFILE ------------------
 exports.getProfile = async (req, res) => {
@@ -66,5 +69,63 @@ exports.deleteAccount = async (req, res) => {
   } catch (err) {
     console.error("Error in deleteAccount:", err);
     res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// ------------------ GET SELLER STATS ------------------
+exports.getSellerStats = async (req, res) => {
+  try {
+    const sellerId = req.user.id;
+
+    // 1. Total unique products by this seller
+    const totalProducts = await Artwork.countDocuments({ artistId: sellerId });
+
+    // 2. Last 30 days filter
+    const lastMonth = new Date();
+    lastMonth.setDate(lastMonth.getDate() - 30);
+
+    // 3. Aggregation: only include PAID orders, then unwind items
+    const stats = await Order.aggregate([
+      { $match: { createdAt: { $gte: lastMonth } } },
+      { $unwind: "$items" },
+      {
+        $match: {
+          // Handle both ObjectId and string storage
+          $expr: {
+            $eq: [
+              "$items.sellerId",
+              mongoose.Types.ObjectId.isValid(sellerId)
+                ? new mongoose.Types.ObjectId(sellerId)
+                : sellerId,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 }, // count each item as an order line
+          totalRevenue: {
+            $sum: { $multiply: ["$items.qty", "$items.unitPrice"] },
+          },
+        },
+      },
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalProducts,
+        totalOrders: stats[0]?.totalOrders || 0,
+        totalRevenue: stats[0]?.totalRevenue || 0,
+      },
+    });
+  } catch (err) {
+    console.error("Error in getSellerStats:", err);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching seller stats",
+      error: err.message,
+    });
   }
 };

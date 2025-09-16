@@ -12,4 +12,7 @@ router.put("/update", authMiddleware, userController.updateProfile);
 // Delete logged-in user's account
 router.delete("/delete", authMiddleware, userController.deleteAccount);
 
+// Get seller stats
+router.get("/stats", authMiddleware, userController.getSellerStats);
+
 module.exports = router;
