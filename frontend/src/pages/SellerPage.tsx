@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { NewPostForm } from '@/components/forms/NewPostForm';
 import { InventoryTable } from '@/components/seller/InventoryTable';
-import { Plus, Package, ShoppingCart, BarChart, Eye, MessageCircle } from 'lucide-react';
+import { Plus, Package, ShoppingCart, BarChart, Eye } from 'lucide-react';
 import { orderService } from '@/services/order';
+import { userService } from '@/services/user'; // import userService for stats
 import { Loader } from '@/components/ui/Loader';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -45,29 +46,16 @@ const SellerPage = () => {
   const [orders, setOrders] = useState<SellerOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<SellerOrder | null>(null);
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+  });
   const { toast } = useToast();
 
-  // Mock stats data - you can replace with real API calls
-  const stats = [
-    {
-      title: 'Total Products',
-      value: '24', //change this to dynamic value
-      icon: Package,
-      description: '+2 from last month', //change this to dynamic value
-    },
-    {
-      title: 'Total Orders',
-      value: orders.length.toString(),
-      icon: ShoppingCart,
-      description: '+12 from last week', //change this to dynamic value
-    },
-    {
-      title: 'Revenue',
-      value: `₹${orders.reduce((sum, order) => sum + order.total, 0).toFixed(2)}`,
-      icon: BarChart,
-      description: '+8% from last month', //change this to dynamic value
-    },
-  ];
+  useEffect(() => {
+    loadSellerStats();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'orders') {
@@ -75,12 +63,44 @@ const SellerPage = () => {
     }
   }, [activeTab]);
 
+  const loadSellerStats = async () => {
+    try {
+      const response = await userService.getSellerStats();
+      if (response.success) {
+        setStats(response.stats);
+      }
+    } catch (error) {
+      console.error('Error loading seller stats:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load seller statistics.',
+      });
+    }
+  };
+
   const loadSellerOrders = async () => {
     try {
       setLoading(true);
       const response = await orderService.getSales();
       if (response.success && response.sales) {
-        setOrders(response.sales);
+        setOrders(
+          response.sales.map((order: any) => ({
+            ...order,
+            items: order.items.map((item: any) => ({
+              artworkId: {
+                _id: item.artworkId._id,
+                title: item.artworkId.title,
+                price: item.artworkId.price,
+                currency: item.artworkId.currency,
+              },
+              sellerId: typeof item.sellerId === 'string' ? item.sellerId : item.sellerId._id,
+              qty: item.qty,
+              unitPrice: item.unitPrice,
+              titleCopy: item.titleCopy,
+            })),
+          }))
+        );
       }
     } catch (error) {
       console.error('Error loading orders:', error);
@@ -98,7 +118,6 @@ const SellerPage = () => {
     try {
       const response = await orderService.updateOrderStatus(orderId, { artworkId, status: newStatus });
       if (response.success) {
-        // Update local state
         setOrders(orders.map(order => 
           order._id === orderId 
             ? { ...order, status: newStatus }
@@ -269,6 +288,27 @@ const SellerPage = () => {
     );
   };
 
+  const statsCards = [
+    {
+      title: 'Total Products',
+      value: stats.totalProducts.toString(),
+      icon: Package,
+      description: 'Products added in the last 30 days',
+    },
+    {
+      title: 'Total Orders',
+      value: stats.totalOrders.toString(),
+      icon: ShoppingCart,
+      description: 'Orders received in the last 30 days',
+    },
+    {
+      title: 'Revenue',
+      value: `₹${stats.totalRevenue.toFixed(2)}`,
+      icon: BarChart,
+      description: 'Revenue generated in the last 30 days',
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -282,7 +322,7 @@ const SellerPage = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <Card key={index} className="card-hover">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">

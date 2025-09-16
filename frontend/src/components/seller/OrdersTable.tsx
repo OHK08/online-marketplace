@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
 import { orderService, type Order } from '@/services/order';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
 import { format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export const OrdersTable = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSellerOrders = async () => {
@@ -37,10 +38,10 @@ export const OrdersTable = () => {
 
   const getCurrencySymbol = (currency: string) => {
     const symbols: { [key: string]: string } = {
-      'INR': '₹',
-      'USD': '$',
-      'EUR': '€',
-      'GBP': '£'
+      INR: '₹',
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
     };
     return symbols[currency] || currency;
   };
@@ -61,6 +62,47 @@ export const OrdersTable = () => {
         return 'destructive';
       default:
         return 'secondary';
+    }
+  };
+
+  const handleStatusChange = async (
+    orderId: string,
+    artworkId: string,
+    newStatus: Order['status']
+  ) => {
+    try {
+      setUpdating(orderId);
+      const response = await orderService.updateOrderStatus(orderId, {
+        artworkId,
+        status: newStatus,
+      });
+
+      if (response.success && response.order) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === orderId ? { ...o, status: newStatus } : o
+          )
+        );
+        toast({
+          title: 'Success',
+          description: `Order status updated to ${newStatus}.`,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: response.message || 'Failed to update status.',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to update order status.',
+      });
+    } finally {
+      setUpdating(null);
     }
   };
 
@@ -93,20 +135,43 @@ export const OrdersTable = () => {
             <TableRow key={order._id}>
               <TableCell className="font-medium">{order._id.slice(-8).toUpperCase()}</TableCell>
               <TableCell>{order.buyerId.name}</TableCell>
+              <TableCell>{order.items.map((item) => item.titleCopy).join(', ')}</TableCell>
               <TableCell>
-                {order.items.map((item) => item.titleCopy).join(', ')}
+                {getCurrencySymbol(order.currency)}
+                {order.total.toFixed(2)}
               </TableCell>
               <TableCell>
-                {getCurrencySymbol(order.currency)}{order.total.toFixed(2)}
-              </TableCell>
-              <TableCell>
-                <Badge variant={getStatusVariant(order.status)}>
-                  {order.status.replace('_', ' ')}
-                </Badge>
+                {/* Dropdown for status change */}
+                <Select
+                  defaultValue={order.status}
+                  onValueChange={(value) =>
+                    handleStatusChange(order._id, order.items[0].artworkId._id, value as Order['status'])
+                  }
+                  disabled={updating === order._id}
+                >
+
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created">Created</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                  </SelectContent>
+                </Select>
               </TableCell>
               <TableCell>{format(new Date(order.createdAt), 'MMM dd, yyyy')}</TableCell>
               <TableCell>
-                <Button variant="ghost" size="sm" onClick={() => window.location.href = `/orders/${order._id}`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => (window.location.href = `/orders/${order._id}`)}
+                >
                   <Eye className="w-4 h-4" />
                 </Button>
               </TableCell>

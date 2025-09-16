@@ -35,4 +35,17 @@ export const userService = {
     const response = await apiClient.get(`/users/${userId}`);
     return response.data;
   },
+
+  // Get seller stats
+  async getSellerStats(): Promise<{
+    success: boolean;
+    stats: {
+      totalProducts: number;
+      totalOrders: number;
+      totalRevenue: number;
+    };
+  }> {
+    const response = await apiClient.get('/user/stats');
+    return response.data;
+  },
 };
