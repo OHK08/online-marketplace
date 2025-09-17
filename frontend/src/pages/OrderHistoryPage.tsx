@@ -9,13 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Package, Search, Eye, MessageCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Loader } from '@/components/ui/Loader';
-import { orderService, Order } from '@/services/order'; // 👈 Import the correct Order type
+import { orderService, Order } from '@/services/order';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 const OrderHistoryPage = () => {
-  // Use the imported Order type directly
-  const [orders, setOrders] = useState<Order[]>([]); 
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -166,7 +165,7 @@ const OrderHistoryPage = () => {
                 <div className="flex flex-col lg:flex-row gap-6">
                   {/* Order Image(s) */}
                   <div className="flex-shrink-0">
-                    {order.items.length === 1 && order.items[0].artworkId.media && order.items[0].artworkId.media.length > 0 ? (
+                    {order.items.length === 1 && order.items[0].artworkId?.media?.length ? (
                       <img
                         src={order.items[0].artworkId.media[0].url}
                         alt={order.items[0].titleCopy}
@@ -194,7 +193,7 @@ const OrderHistoryPage = () => {
                         </h3>
                         {order.items.length > 1 && (
                           <div className="text-sm text-muted-foreground">
-                            {order.items.map((item, idx) => item.titleCopy).join(', ')}
+                            {order.items.map((item) => item.titleCopy).join(', ')}
                           </div>
                         )}
                       </div>
@@ -271,7 +270,7 @@ const OrderHistoryPage = () => {
                                   <div key={index} className="flex justify-between items-center p-3 bg-muted rounded">
                                     <div className="flex items-center gap-3">
                                       <img
-                                        src={item.artworkId.media && item.artworkId.media.length > 0 ? item.artworkId.media[0].url : '/placeholder.svg'}
+                                        src={item.artworkId?.media?.length ? item.artworkId.media[0].url : '/placeholder.svg'}
                                         alt={item.titleCopy}
                                         className="w-12 h-12 object-cover rounded"
                                       />

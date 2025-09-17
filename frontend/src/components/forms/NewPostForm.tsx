@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Sparkles, Upload, X } from 'lucide-react';
 import { useState } from 'react';
-import { aiClient } from '@/services/aiClient';
+import { visionAiService } from "@/services/visionAi";
 import { artworkService } from '@/services/artwork';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,31 +28,62 @@ export const NewPostForm = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewFiles, setPreviewFiles] = useState<Array<{ file: File; url: string }>>([]);
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    price_range: string;
+    market_analysis: string;
+    reasoning: string;
+  } | null>(null);
   const { toast } = useToast();
 
   const form = useForm<NewPostFormData>({
     resolver: zodResolver(newPostSchema),
     defaultValues: {
-      title: '', 
-      description: '', 
-      price: 0, 
+      title: '',
+      description: '',
+      price: 0,
       currency: 'INR',
       quantity: 1,
       status: 'draft' as const,
     },
   });
 
-  const generateCaption = async () => {
+  // AI Price Suggestion
+  const generatePriceSuggestion = async () => {
     setIsGenerating(true);
     try {
       const title = form.getValues('title');
-      const { text } = await aiClient.generate({
-        type: 'caption',
-        prompt: `Product: ${title}`,
-      });
-      form.setValue('description', text);
+      const description = form.getValues('description');
+
+      const resp = await visionAiService.priceSuggestion(previewFiles[0]?.file);
+
+      if (resp.data) {
+        setAiSuggestion(resp.data);
+
+        if (resp.data.price_range) {
+          const [min, max] = resp.data.price_range
+            .replace(/[₹$,]/g, '')
+            .split('-')
+            .map((val) => parseFloat(val.trim()));
+          if (!isNaN(min) && !isNaN(max)) {
+            const avgPrice = (min + max) / 2;
+            form.setValue('price', avgPrice);
+          }
+        }
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'AI Error',
+          description: resp.error || 'Could not generate price suggestion',
+        });
+      }
+
     } catch (error) {
-      console.error('Failed to generate caption:', error);
+      console.error('Failed to generate price suggestion:', error);
+      toast({
+        variant: 'destructive',
+        title: 'AI Error',
+        description: 'Could not generate price suggestion',
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -60,39 +91,28 @@ export const NewPostForm = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
-    // Limit to 5 files maximum
     const limitedFiles = files.slice(0, 5 - previewFiles.length);
-    
-    // Create new previews and add to existing ones
-    const newPreviews = limitedFiles.map(file => ({
+    const newPreviews = limitedFiles.map((file) => ({
       file,
-      url: URL.createObjectURL(file)
+      url: URL.createObjectURL(file),
     }));
-    
     const allPreviews = [...previewFiles, ...newPreviews];
     setPreviewFiles(allPreviews);
-    
-    // Update form data with all files
+
     const fileList = new DataTransfer();
-    allPreviews.forEach(preview => fileList.items.add(preview.file));
+    allPreviews.forEach((preview) => fileList.items.add(preview.file));
     form.setValue('media', fileList.files.length > 0 ? fileList.files : undefined);
-    
-    // Reset input value to allow re-selecting same files
+
     e.target.value = '';
   };
 
   const removeFile = (indexToRemove: number) => {
     const updatedPreviews = previewFiles.filter((_, index) => index !== indexToRemove);
-    
-    // Revoke URL for removed file
     URL.revokeObjectURL(previewFiles[indexToRemove].url);
-    
     setPreviewFiles(updatedPreviews);
-    
-    // Update form data
+
     const fileList = new DataTransfer();
-    updatedPreviews.forEach(preview => fileList.items.add(preview.file));
+    updatedPreviews.forEach((preview) => fileList.items.add(preview.file));
     form.setValue('media', fileList.files.length > 0 ? fileList.files : undefined);
   };
 
@@ -100,7 +120,7 @@ export const NewPostForm = () => {
     setIsSubmitting(true);
     try {
       const mediaFiles = data.media as FileList | undefined;
-      
+
       await artworkService.createArtwork({
         title: data.title,
         description: data.description,
@@ -116,10 +136,9 @@ export const NewPostForm = () => {
         description: 'Product created successfully!',
       });
 
-      // Clean up preview URLs
-      previewFiles.forEach(preview => URL.revokeObjectURL(preview.url));
+      previewFiles.forEach((preview) => URL.revokeObjectURL(preview.url));
       setPreviewFiles([]);
-      
+      setAiSuggestion(null);
       form.reset();
     } catch (error) {
       console.error('Error creating artwork:', error);
@@ -149,26 +168,13 @@ export const NewPostForm = () => {
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <div className="flex items-center justify-between">
-                <FormLabel>Description</FormLabel>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={generateCaption}
-                  disabled={isGenerating || !form.getValues('title')}
-                  className="flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {isGenerating ? 'Generating...' : 'AI Suggest'}
-                </Button>
-              </div>
+              <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea placeholder="Describe your product" {...field} />
               </FormControl>
@@ -183,21 +189,39 @@ export const NewPostForm = () => {
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price</FormLabel>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Price</FormLabel>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generatePriceSuggestion}
+                    disabled={isGenerating || !form.getValues('title')}
+                    className="flex items-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {isGenerating ? 'Analyzing...' : 'AI Price Suggest'}
+                  </Button>
+                </div>
+                <span style={{ fontSize: '0.80rem', color: '#6B7280', display: 'block', marginTop: '0.25rem' }}>
+                  Add image first to get AI price suggestion
+                </span>
                 <FormControl>
                   <Input
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     {...field}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
+                    }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="currency"
@@ -221,7 +245,7 @@ export const NewPostForm = () => {
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="quantity"
@@ -233,7 +257,9 @@ export const NewPostForm = () => {
                     type="number"
                     placeholder="1"
                     {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value) || 1)
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -241,6 +267,22 @@ export const NewPostForm = () => {
             )}
           />
         </div>
+
+        {aiSuggestion && (
+          <div className="p-4 border rounded-lg bg-muted/30 space-y-2">
+            <p className="text-sm">
+              <strong>Suggested Range:</strong> {aiSuggestion.price_range}
+            </p>
+            <p className="text-sm">
+              <strong>Reasoning:</strong> {aiSuggestion.reasoning}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {aiSuggestion.market_analysis}
+            </p>
+          </div>
+        )}
+
+        {/* ...status, media upload, previews, submit button (unchanged)... */}
 
         <FormField
           control={form.control}
@@ -267,7 +309,7 @@ export const NewPostForm = () => {
         <FormField
           control={form.control}
           name="media"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
               <FormLabel>Product Images</FormLabel>
               <FormControl>
@@ -298,7 +340,9 @@ export const NewPostForm = () => {
 
         {previewFiles.length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-foreground">Preview ({previewFiles.length}/5)</h4>
+            <h4 className="text-sm font-medium text-foreground">
+              Preview ({previewFiles.length}/5)
+            </h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {previewFiles.map((preview, index) => (
                 <div key={index} className="relative group">

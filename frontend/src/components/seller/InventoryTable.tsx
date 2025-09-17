@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit, Trash, Package } from 'lucide-react';
+import { Edit, Trash, Package, TrendingUp } from 'lucide-react';
 import { artworkService, type Artwork } from '@/services/artwork';
+import { visionAiService } from '@/services/visionAi';
 import { useToast } from '@/hooks/use-toast';
 import { Loader } from '@/components/ui/Loader';
 
@@ -18,6 +19,9 @@ export const InventoryTable = () => {
   const [editingArtwork, setEditingArtwork] = useState<Artwork | null>(null);
   const [restockingArtwork, setRestockingArtwork] = useState<Artwork | null>(null);
   const [restockQuantity, setRestockQuantity] = useState(1);
+  const [aiBoostingArtwork, setAiBoostingArtwork] = useState<Artwork | null>(null);
+  const [aiBoostData, setAiBoostData] = useState<any>(null);
+  const [aiBoostError, setAiBoostError] = useState<boolean>(false);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -46,7 +50,6 @@ export const InventoryTable = () => {
         setLoading(false);
       }
     };
-
     loadMyArtworks();
   }, [toast]);
 
@@ -54,27 +57,15 @@ export const InventoryTable = () => {
     try {
       await artworkService.deleteArtwork(id);
       setArtworks(artworks.filter(artwork => artwork._id !== id));
-      toast({
-        title: 'Success',
-        description: 'Artwork deleted successfully.',
-      });
+      toast({ title: 'Success', description: 'Artwork deleted successfully.' });
     } catch (error) {
       console.error('Error deleting artwork:', error);
-      toast({
-        variant: 'destructive', 
-        title: 'Error',
-        description: 'Failed to delete artwork.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete artwork.' });
     }
   };
 
   const getCurrencySymbol = (currency: string) => {
-    const symbols: { [key: string]: string } = {
-      'INR': '₹',
-      'USD': '$', 
-      'EUR': '€',
-      'GBP': '£'
-    };
+    const symbols: { [key: string]: string } = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
     return symbols[currency] || currency;
   };
 
@@ -86,13 +77,16 @@ export const InventoryTable = () => {
       price: artwork.price,
       currency: artwork.currency,
       quantity: artwork.quantity,
-      status: artwork.quantity === 0 ? 'out_of_stock' : artwork.status
+      status: artwork.quantity === 0
+        ? 'out_of_stock'
+        : (['draft', 'published', 'out_of_stock'].includes(artwork.status)
+          ? artwork.status as 'draft' | 'published' | 'out_of_stock'
+          : 'draft')
     });
   };
 
   const handleUpdateArtwork = async () => {
     if (!editingArtwork) return;
-    
     try {
       const updatedForm = {
         ...editForm,
@@ -100,65 +94,63 @@ export const InventoryTable = () => {
         price: parseFloat(String(editForm.price)),
         status: editForm.quantity === 0 ? 'out_of_stock' : editForm.status
       };
-
       const response = await artworkService.updateArtwork(editingArtwork._id, updatedForm);
-      
       if (response.success && response.artwork) {
-        setArtworks(artworks.map(artwork => 
-          artwork._id === editingArtwork._id 
-            ? response.artwork!
-            : artwork
-        ));
-        
+        setArtworks(artworks.map(artwork => artwork._id === editingArtwork._id ? response.artwork! : artwork));
         setEditingArtwork(null);
-        toast({
-          title: 'Success',
-          description: 'Artwork updated successfully.',
-        });
+        toast({ title: 'Success', description: 'Artwork updated successfully.' });
       }
     } catch (error) {
       console.error('Error updating artwork:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error', 
-        description: 'Failed to update artwork. Only draft artworks can be edited.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update artwork. Only draft artworks can be edited.' });
     }
   };
 
   const handleRestock = async () => {
     if (!restockingArtwork || restockQuantity <= 0) return;
-    
     try {
       const response = await artworkService.restockArtwork(restockingArtwork._id, restockQuantity);
-      
       if (response.success && response.artwork) {
-        setArtworks(artworks.map(artwork => 
-          artwork._id === restockingArtwork._id 
-            ? response.artwork!
-            : artwork
-        ));
-        
+        setArtworks(artworks.map(artwork => artwork._id === restockingArtwork._id ? response.artwork! : artwork));
         setRestockingArtwork(null);
         setRestockQuantity(1);
-        toast({
-          title: 'Success',
-          description: 'Artwork restocked successfully.',
-        });
+        toast({ title: 'Success', description: 'Artwork restocked successfully.' });
       }
     } catch (error) {
       console.error('Error restocking artwork:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to restock artwork.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to restock artwork.' });
     }
   };
 
-  if (loading) {
-    return <Loader text="Loading your products..." />;
+ const handleAiBoost = async (artwork: Artwork) => {
+  setAiBoostingArtwork(artwork);
+  setAiBoostData(null);
+  setAiBoostError(false);
+
+  try {
+    const imageUrl = artwork.media?.[0]?.url;
+    if (!imageUrl) {
+      throw new Error("No image found for artwork.");
+    }
+
+    // Fetch the image and convert to Blob
+    const response = await fetch(imageUrl);
+    const imageBlob = await response.blob();
+
+    // Run API calls directly (removed timeout logic)
+    const [purchaseAnalysis, fulfillmentAnalysis] = await Promise.all([
+      visionAiService.purchaseAnalysis(imageBlob),
+      visionAiService.orderFulfillment(imageBlob)
+    ]);
+
+    setAiBoostData({ ...purchaseAnalysis, ...fulfillmentAnalysis });
+  } catch (error) {
+    console.error("Error calling VisionAI APIs:", error);
+    setAiBoostError(true);
   }
+};
+
+  if (loading) return <Loader text="Loading your products..." />;
 
   return (
     <Table>
@@ -170,41 +162,34 @@ export const InventoryTable = () => {
           <TableHead>Status</TableHead>
           <TableHead>Likes</TableHead>
           <TableHead>Actions</TableHead>
+          <TableHead>AI Boost</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {artworks.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
               No products found. Create your first product!
             </TableCell>
           </TableRow>
         ) : (
-          artworks.map((artwork) => (
+          artworks.map(artwork => (
             <TableRow key={artwork._id}>
               <TableCell className="font-medium">{artwork.title}</TableCell>
               <TableCell>{getCurrencySymbol(artwork.currency)}{artwork.price}</TableCell>
               <TableCell>{artwork.quantity}</TableCell>
               <TableCell>
-                <Badge variant={
-                  artwork.status === 'published' ? 'default' : 
-                  artwork.status === 'out_of_stock' ? 'destructive' : 
-                  'secondary'
-                }>
+                <Badge variant={artwork.status === 'published' ? 'default' : artwork.status === 'out_of_stock' ? 'destructive' : 'secondary'}>
                   {artwork.status.replace('_', ' ')}
                 </Badge>
               </TableCell>
               <TableCell>{artwork.likeCount}</TableCell>
               <TableCell>
                 <div className="flex gap-2">
+                  {/* Edit */}
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        disabled={artwork.status !== 'draft'}
-                        onClick={() => handleEdit(artwork)}
-                      >
+                      <Button variant="ghost" size="sm" disabled={artwork.status !== 'draft'} onClick={() => handleEdit(artwork)}>
                         <Edit className="w-4 h-4" />
                       </Button>
                     </DialogTrigger>
@@ -218,7 +203,7 @@ export const InventoryTable = () => {
                           <Input
                             id="title"
                             value={editForm.title}
-                            onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                           />
                         </div>
                         <div>
@@ -226,7 +211,7 @@ export const InventoryTable = () => {
                           <Textarea
                             id="description"
                             value={editForm.description}
-                            onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -236,7 +221,7 @@ export const InventoryTable = () => {
                               id="price"
                               type="number"
                               value={editForm.price}
-                              onChange={(e) => setEditForm({...editForm, price: parseFloat(e.target.value) || 0})}
+                              onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })}
                             />
                           </div>
                           <div>
@@ -244,7 +229,7 @@ export const InventoryTable = () => {
                             <Input
                               id="currency"
                               value={editForm.currency}
-                              onChange={(e) => setEditForm({...editForm, currency: e.target.value})}
+                              onChange={(e) => setEditForm({ ...editForm, currency: e.target.value })}
                               placeholder="Enter currency code (e.g., USD, EUR)"
                             />
                           </div>
@@ -257,14 +242,14 @@ export const InventoryTable = () => {
                               type="number"
                               min="0"
                               value={editForm.quantity}
-                              onChange={(e) => setEditForm({...editForm, quantity: parseInt(e.target.value) || 0})}
+                              onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 0 })}
                             />
                           </div>
                           <div>
                             <Label htmlFor="status">Status</Label>
-                            <Select 
-                              value={editForm.quantity === 0 ? 'out_of_stock' : editForm.status} 
-                              onValueChange={(value) => setEditForm({...editForm, status: value})}
+                            <Select
+                              value={editForm.quantity === 0 ? 'out_of_stock' : editForm.status}
+                              onValueChange={(value) => setEditForm({ ...editForm, status: value as 'draft' | 'published' | 'out_of_stock' })}
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -285,15 +270,12 @@ export const InventoryTable = () => {
                       </div>
                     </DialogContent>
                   </Dialog>
-                  
+
+                  {/* Restock */}
                   {artwork.status === 'out_of_stock' && (
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setRestockingArtwork(artwork)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => setRestockingArtwork(artwork)}>
                           <Package className="w-4 h-4" />
                         </Button>
                       </DialogTrigger>
@@ -324,15 +306,112 @@ export const InventoryTable = () => {
                       </DialogContent>
                     </Dialog>
                   )}
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => handleDelete(artwork._id)}
-                  >
+
+                  {/* Delete */}
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(artwork._id)}>
                     <Trash className="w-4 h-4" />
                   </Button>
                 </div>
+              </TableCell>
+
+              {/* AI Boost */}
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleAiBoost(artwork)}
+                >
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                </Button>
+
+                <Dialog
+                  open={!!aiBoostingArtwork}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setAiBoostingArtwork(null);
+                      setAiBoostData(null);
+                      setAiBoostError(false);
+                    }
+                  }}
+                >
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>
+                        AI Boost for: {aiBoostingArtwork?.title}
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    {aiBoostingArtwork?.media?.[0]?.url && (
+                      <div className="mb-4">
+                        <img
+                          src={aiBoostingArtwork.media[0].url}
+                          alt={aiBoostingArtwork.title}
+                          className="w-full max-h-64 object-contain rounded-lg shadow"
+                        />
+                      </div>
+                    )}
+
+                    {aiBoostData ? (
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-semibold">Suggested Items to Sell:</h4>
+                          <ul className="list-disc list-inside">
+                            {aiBoostData.cart_suggestions?.map((item: string, index: number) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold">Packaging Suggestions:</h4>
+                          <ul className="list-disc list-inside">
+                            {aiBoostData.packaging_suggestions?.map((item: string, index: number) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold">Shipping Considerations:</h4>
+                          <p className="text-muted-foreground">
+                            {aiBoostData.shipping_considerations}
+                          </p>
+                        </div>
+                      </div>
+                    ) : aiBoostError ? (
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-semibold">Suggested Items to Sell:</h4>
+                          <ul className="list-disc list-inside">
+                            <li key="1">Complementary artwork prints</li>
+                            <li key="2">Custom frames for this piece</li>
+                            <li key="3">Art-themed merchandise (e.g., mugs, posters)</li>
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold">Packaging Suggestions:</h4>
+                          <ul className="list-disc list-inside">
+                            <li key="1">Use acid-free tissue paper for protection</li>
+                            <li key="2">Include a sturdy cardboard backing</li>
+                            <li key="3">Seal in a waterproof sleeve</li>
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold">Shipping Considerations:</h4>
+                          <p className="text-muted-foreground">
+                            Ensure fragile items are marked clearly and use a reliable courier with tracking.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-center py-8">
+                        <Loader text="Boosting sales with AI..." />
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </TableCell>
             </TableRow>
           ))
