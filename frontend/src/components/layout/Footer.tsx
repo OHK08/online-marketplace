@@ -12,7 +12,7 @@ export const Footer = () => {
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-glow rounded-lg flex items-center justify-center">
                 <ShoppingBag className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-bold text-xl">Marketplace</span>
+              <span className="font-bold text-xl">Orchid</span>
             </div>
             <p className="text-muted-foreground text-sm">
               Discover unique products from creative sellers around the world.

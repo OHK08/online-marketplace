@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api/v1';
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'https://online-marketplace-backend-qw55.onrender.com/';
 
 const apiClient = axios.create({
   baseURL,

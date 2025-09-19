@@ -8,7 +8,7 @@ export const AboutPage = () => {
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-6">
-            About Our <span className="text-gradient">Marketplace</span>
+            About <span className="text-gradient">Orchid</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             We're building a vibrant community where creative minds connect, 
@@ -98,7 +98,7 @@ export const AboutPage = () => {
         <div className="bg-muted/50 rounded-lg p-8 mb-16">
           <h2 className="text-3xl font-bold mb-6">Our Story</h2>
           <p className="text-muted-foreground mb-4 leading-relaxed">
-            Founded in 2024, our marketplace started with a simple idea: creative people 
+            Founded in 2024, Orchid started with a simple idea: creative people 
             needed a better way to share and monetize their work. What began as a small 
             platform has grown into a thriving ecosystem of thousands of creators.
           </p>
