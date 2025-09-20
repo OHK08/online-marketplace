@@ -23,6 +23,7 @@ export interface Artwork {
   quantity: number;
   status: 'draft' | 'published' | 'removed' | 'out_of_stock';
   likeCount: number;
+  tags?: string[]; 
   createdAt: string;
   updatedAt: string;
 }

@@ -6,6 +6,7 @@ import { artworkService, type Artwork } from '@/services/artwork';
 import { likeService } from '@/services/like';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 const DashboardPage = () => {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
@@ -59,8 +60,20 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+        {/* Blinking Festive Offers Banner */}
+        <div className="text-center mb-6">
+          <Link to="/festive-special">
+            <h2 className="text-2xl font-bold text-black-500 animate-bounce">
+              🎉 Festive Offers! 🎉
+            </h2>
+          </Link>
+        </div>
         {/* Stories Bar */}
-        <div className="mb-8">
+        <h1 className="text-2xl font-bold">New Product Stories</h1>
+        <p className="text-muted-foreground">
+            Curated just for you from our community of creative sellers
+          </p>
+        <div className="mb-8 mt-2">
           <StoryBar />
         </div>
 

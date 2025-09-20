@@ -1,7 +1,7 @@
 // frontend/src/services/searchAi.ts
 import apiClient from "@/lib/axios";
 
-export interface SearchAIResponse<T = any> {
+export interface SearchAIResponse<T = unknown> {
   success?: boolean;
   data?: T;
   error?: string;

@@ -6,10 +6,7 @@ const { cloudinary } = require("../config/cloudinary");
 // ------------------ CREATE ARTWORK ------------------
 exports.createArtwork = async (req, res) => {
   try {
-    console.log("Incoming body:", req.body);
-    console.log("Incoming files:", req.files);
-
-    const { title, description, price, currency, quantity, status } = req.body;
+    const { title, description, price, currency, quantity, status, tags } = req.body;
 
     if (!title || !price) {
       return res.status(400).json({
@@ -17,16 +14,12 @@ exports.createArtwork = async (req, res) => {
         message: "Title and price are required",
       });
     }
-
-    // Build media array from multer-cloudinary output
     let media = (req.files || []).map((file) => ({
-      url: file.path,              // secure_url from Cloudinary
+      url: file.path,
       type: file.mimetype.startsWith("video") ? "video" : "image",
       sizeBytes: file.size,
-      storageKey: file.filename,   // Cloudinary public_id
+      storageKey: file.filename,
     }));
-
-    // Create artwork in DB
     const artwork = await Artwork.create({
       artistId: req.user.id,
       title,
@@ -34,10 +27,10 @@ exports.createArtwork = async (req, res) => {
       price,
       currency: currency || "INR",
       quantity: quantity || 1,
-      status: status || "draft", // default to draft
+      status: status || "draft",
+      tags: tags || [], // save tags
       media,
     });
-
     res.status(201).json({
       success: true,
       message: "Artwork posted successfully",
@@ -52,8 +45,6 @@ exports.createArtwork = async (req, res) => {
     });
   }
 };
-
-
 
 // ------------------ GET ALL ARTWORKS ------------------
 exports.getAllArtworks = async (req, res) => {
@@ -162,37 +153,26 @@ exports.myArtworks = async (req, res) => {
 exports.updateArtwork = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, price, currency, quantity, status } = req.body;
-
+    const { title, description, price, currency, quantity, status, tags } = req.body; // include tags
     const artwork = await Artwork.findById(id);
-
-    if (!artwork) {
-      return res.status(404).json({ success: false, message: "Artwork not found" });
-    }
-
-    // Only owner can edit
+    if (!artwork) return res.status(404).json({ success: false, message: "Artwork not found" });
     if (artwork.artistId.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
-
-    // Only editable if draft
     if (artwork.status !== "draft") {
       return res.status(400).json({
         success: false,
         message: "Only artworks in draft state can be edited",
       });
     }
-
-    // Apply updates
     if (title) artwork.title = title;
     if (description) artwork.description = description;
     if (price) artwork.price = price;
     if (currency) artwork.currency = currency;
     if (quantity) artwork.quantity = quantity;
-    if (status) artwork.status = status; // e.g., switch to published after editing
-
+    if (status) artwork.status = status;
+    if (tags) artwork.tags = tags; // update tags
     await artwork.save();
-
     res.json({
       success: true,
       message: "Artwork updated successfully",
@@ -207,7 +187,6 @@ exports.updateArtwork = async (req, res) => {
     });
   }
 };
-
 
 // ------------------ RESTOCK ARTWORK ------------------
 exports.restockArtwork = async (req, res) => {

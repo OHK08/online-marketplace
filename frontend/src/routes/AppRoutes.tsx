@@ -18,6 +18,7 @@ import { ArtworkDetailPage } from '@/pages/ArtworkDetailPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { ArtistPage } from '@/pages/ArtistPage';
+import FestiveSpecialPage from '@/pages/FestiveSpecialPage';
 
 export const AppRoutes = () => {
   const { mode } = useUI();
@@ -95,6 +96,14 @@ export const AppRoutes = () => {
         element={
           <RequireAuth>
             <MainLayout><CartPage /></MainLayout>
+          </RequireAuth>
+        } 
+      />
+      <Route 
+        path="/festive-special" 
+        element={
+          <RequireAuth>
+            <MainLayout><FestiveSpecialPage /></MainLayout>
           </RequireAuth>
         } 
       />
