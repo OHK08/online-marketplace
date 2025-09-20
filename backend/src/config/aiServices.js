@@ -1,7 +1,7 @@
 // backend/src/config/aiServices.js
 module.exports = {
   visionAI: {
-    baseURL: process.env.AI_SERVICES_URL || "https://online-marketplace-visionai.onrender.com",
+    baseURL: process.env.AI_SERVICES_URL || "https://online-marketplace-visionai.onrender.com/api/v1/",
     apiKey: process.env.AI_SERVICE_KEY || "srv-d36p196uk2gs73a6qmj0",
   },
   searchAI: {
