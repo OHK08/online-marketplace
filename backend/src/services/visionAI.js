@@ -2,8 +2,8 @@
 const axios = require("axios");
 const FormData = require("form-data");
 
-const AI_BASE = process.env.AI_SERVICES_URL || "https://online-marketplace-visionai.onrender.com/api/v1/";
-const AI_API_KEY = process.env.AI_SERVICE_KEY || "srv-d36p196uk2gs73a6qmj0";
+const AI_BASE = process.env.AI_SERVICES_URL || "http://localhost:5001";
+const AI_API_KEY = process.env.AI_SERVICE_KEY || "";
 
 /**
  * Fetch raw bytes from an accessible URL (Cloudinary secure_url)
