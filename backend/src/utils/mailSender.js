@@ -2,27 +2,16 @@ const nodemailer = require("nodemailer");
 
 const mailSender = async (email, title, body) => {
   try {
-    let transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST || "smtp.gmail.com",
-      port: 465,
-      secure: true, // true for 465, false for 587
+    const transporter = nodemailer.createTransport({
+      service: "SendGrid",
       auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASSWORD,
+        user: "apikey", // this is fixed string for SendGrid
+        pass: process.env.SENDGRID_API_KEY,
       },
     });
 
-    // Verify SMTP connection
-    transporter.verify((err, success) => {
-      if (err) {
-        console.error("SMTP connection error:", err);
-      } else {
-        console.log("SMTP ready");
-      }
-    });
-
     let info = await transporter.sendMail({
-      from: `"Online MarketPlace" <${process.env.MAIL_USER}>`, // must match auth user
+      from: `Online MarketPlace <${process.env.MAIL_USER}>`,
       to: email,
       subject: title,
       html: body,
