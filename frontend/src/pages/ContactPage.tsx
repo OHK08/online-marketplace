@@ -144,7 +144,7 @@ export const ContactPage = () => {
                   </div>
                   <div>
                     <p className="font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">support@marketplace.com</p>
+                    <p className="text-sm text-muted-foreground">support@orchid.com</p>
                   </div>
                 </div>
 
@@ -154,7 +154,7 @@ export const ContactPage = () => {
                   </div>
                   <div>
                     <p className="font-medium">Phone</p>
-                    <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
+                    <p className="text-sm text-muted-foreground">(+91) 99988877XX</p>
                   </div>
                 </div>
 
@@ -166,7 +166,7 @@ export const ContactPage = () => {
                     <p className="font-medium">Address</p>
                     <p className="text-sm text-muted-foreground">
                       123 Creative Street<br />
-                      Art District, NY 10001
+                      Art District, Pune
                     </p>
                   </div>
                 </div>

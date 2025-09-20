@@ -5,7 +5,7 @@ exports.otpTemplate = (otp) => {
       
       <!-- Header -->
       <div style="background: #2d6a4f; padding: 16px; text-align: center;">
-        <a href="https://your-marketplace-domain.com" target="_blank">
+        <a href="https://orchid-marketplace.vercel.app/" target="_blank">
           <img src="https://i.ibb.co/4pFg4Jm/marketplace-logo.png" alt="Marketplace Logo" style="height: 50px;">
         </a>
       </div>
@@ -14,7 +14,7 @@ exports.otpTemplate = (otp) => {
       <div style="padding: 24px; color: #333333; font-size: 15px; line-height: 1.6;">
         <h2 style="margin-top: 0; color: #1b4332;">OTP Verification</h2>
         <p>Dear User,</p>
-        <p>Welcome to <b>Local Artisans Marketplace</b>! To complete your registration, please use the following One-Time Password (OTP):</p>
+        <p>Welcome to <b>ORCHID - Local Artisans Marketplace</b>! To complete your registration, please use the following One-Time Password (OTP):</p>
         
         <div style="text-align: center; margin: 30px 0;">
           <span style="display: inline-block; font-size: 28px; font-weight: bold; background: #d8f3dc; color: #1b4332; padding: 12px 24px; border-radius: 6px; letter-spacing: 4px;">
@@ -31,7 +31,7 @@ exports.otpTemplate = (otp) => {
         <p>If you have any questions, feel free to contact us at 
           <a href="mailto:support@localartisans.com" style="color: #2d6a4f; text-decoration: none;">support@localartisans.com</a>.
         </p>
-        <p>&copy; ${new Date().getFullYear()} Local Artisans Marketplace. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} ORCHID. All rights reserved.</p>
       </div>
 
     </div>

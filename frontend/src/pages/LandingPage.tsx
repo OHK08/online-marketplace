@@ -29,7 +29,7 @@ const LandingPage = () => {
                   </span>
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-lg">
-                  Join thousands of sellers and buyers in our vibrant marketplace. Find unique items, support local businesses, and discover your next favorite purchase.
+                  Join thousands of sellers and buyers at ORCHID. Find unique items, support local businesses, and discover your next favorite purchase.
                 </p>
               </div>
               
@@ -80,7 +80,7 @@ const LandingPage = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16 animate-slide-up">
             <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Why Choose Our Marketplace?
+              Why Choose ORCHID?
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               Experience the future of online shopping with our innovative features
