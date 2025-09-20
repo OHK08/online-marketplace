@@ -22,7 +22,7 @@ const mailSender = async (email, title, body) => {
     });
 
     let info = await transporter.sendMail({
-      from: `"ORCHID MarketPlace" <${process.env.MAIL_USER}>`, // must match auth user
+      from: `"Online MarketPlace" <${process.env.MAIL_USER}>`, // must match auth user
       to: email,
       subject: title,
       html: body,
