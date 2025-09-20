@@ -18,7 +18,7 @@ const SignupPage = () => {
           </div>
           <h2 className="text-3xl font-bold">Create Your Account</h2>
           <p className="text-muted-foreground">
-            Join Orchid community today
+            Join our marketplace community today
           </p>
         </div>
         

@@ -2,7 +2,7 @@
 const axios = require("axios");
 const FormData = require("form-data");
 
-const AI_BASE = process.env.AI_SERVICES_URL || "https://online-marketplace-visionai.onrender.com/";
+const AI_BASE = process.env.AI_SERVICES_URL || "http://localhost:5001";
 const AI_API_KEY = process.env.AI_SERVICE_KEY || "";
 
 /**
