@@ -1,7 +1,7 @@
-# api/recommendation_routes.py
+# api/recommendation_routes.py - COMPLETE FIXED VERSION
 """
 Recommendation API routes with cultural intelligence
-Follows your existing enhanced_search_routes patterns for consistency
+Enhanced with performance monitoring and debugging capabilities
 """
 
 from fastapi import APIRouter, HTTPException, Query, Body, BackgroundTasks
@@ -54,7 +54,7 @@ async def get_similar_items_simple(
     limit: int = Query(5, ge=1, le=20, description="Number of recommendations"),
     recommendation_types: Optional[str] = Query(
         None, 
-        description="Comma-separated recommendation types (cultural_similarity,regional_discovery,festival_seasonal)"
+        description="Comma-separated recommendation types (cultural_similarity,regional_discovery,festival_seasonal,cross_cultural)"
     ),
     similarity_threshold: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"),
     enable_diversity: bool = Query(True, description="Enable regional/craft diversity"),
@@ -63,9 +63,10 @@ async def get_similar_items_simple(
 ):
     """
     GET endpoint for similar items with query parameters
+    Enhanced with all recommendation types including cross-cultural
     """
     try:
-        # Parse recommendation types
+        # Parse recommendation types with validation
         rec_types = [RecommendationType.CULTURAL_SIMILARITY]  # Default
         if recommendation_types:
             rec_types = []
@@ -73,6 +74,11 @@ async def get_similar_items_simple(
                 rt = rt.strip()
                 if rt in RecommendationType.__members__.values():
                     rec_types.append(RecommendationType(rt))
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid recommendation type: {rt}. Valid types: {list(RecommendationType.__members__.values())}"
+                    )
         
         # Parse excluded items
         excluded_ids = []
@@ -96,16 +102,13 @@ async def get_similar_items_simple(
         
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(ve)}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Error in GET similar items: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Recommendation failed: {str(e)}")
 
 # User preference-based recommendations
-@router.post("/test-lookup/{item_id}")
-async def test_item_lookup(item_id: str):
-    """Test endpoint to debug item lookup"""
-    result = await recommendation_service.test_item_lookup(item_id)
-    return {"debug_info": result}
 
 @router.post("/for-user", response_model=RecommendationResponse)
 async def get_user_recommendations(request: UserPreferenceRequest):
@@ -117,6 +120,7 @@ async def get_user_recommendations(request: UserPreferenceRequest):
     - Preferred craft types, regions, and festivals
     - Budget and material preferences
     - Diversity factor for exploration vs exploitation
+    - Collaborative filtering for users with sufficient history
     """
     try:
         logger.info(f"Getting user recommendations for user: {request.user_id}")
@@ -131,6 +135,122 @@ async def get_user_recommendations(request: UserPreferenceRequest):
             status_code=500,
             detail=f"User recommendations failed: {str(e)}"
         )
+
+@router.get("/for-user/{user_id}")
+async def get_user_recommendations_simple(
+    user_id: str,
+    limit: int = Query(10, ge=1, le=50, description="Number of recommendations"),
+    preferred_regions: Optional[str] = Query(None, description="Comma-separated regions (e.g., 'rajasthan,gujarat')"),
+    preferred_crafts: Optional[str] = Query(None, description="Comma-separated craft types (e.g., 'pottery,textiles')"),
+    preferred_festivals: Optional[str] = Query(None, description="Comma-separated festivals (e.g., 'diwali,holi')"),
+    diversity_factor: float = Query(0.3, ge=0.0, le=1.0, description="Diversity factor (0=similar, 1=diverse)"),
+    budget_min: Optional[float] = Query(None, description="Minimum budget"),
+    budget_max: Optional[float] = Query(None, description="Maximum budget"),
+    recommendation_types: Optional[str] = Query(
+        None,
+        description="Comma-separated types (cultural_similarity,regional_discovery,festival_seasonal)"
+    ),
+    interaction_history: Optional[str] = Query(None, description="Comma-separated item IDs for user history")
+):
+    """
+    GET endpoint for user recommendations with comprehensive query parameters
+    
+    Enhanced with collaborative filtering support and budget constraints
+    """
+    try:
+        # Parse preferred regions with validation
+        region_prefs = []
+        if preferred_regions:
+            for region in preferred_regions.split(','):
+                region = region.strip()
+                if region in IndianRegion.__members__.values():
+                    region_prefs.append(IndianRegion(region))
+                else:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Invalid region: {region}. Valid regions: {list(IndianRegion.__members__.values())}"
+                    )
+        
+        # Parse preferred craft types with validation
+        craft_prefs = []
+        if preferred_crafts:
+            for craft in preferred_crafts.split(','):
+                craft = craft.strip()
+                if craft in CraftType.__members__.values():
+                    craft_prefs.append(CraftType(craft))
+                else:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Invalid craft type: {craft}. Valid types: {list(CraftType.__members__.values())}"
+                    )
+        
+        # Parse preferred festivals with validation
+        festival_prefs = []
+        if preferred_festivals:
+            for festival in preferred_festivals.split(','):
+                festival = festival.strip()
+                if festival in Festival.__members__.values():
+                    festival_prefs.append(Festival(festival))
+                else:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Invalid festival: {festival}. Valid festivals: {list(Festival.__members__.values())}"
+                    )
+        
+        # Parse recommendation types with validation
+        rec_types = [RecommendationType.CULTURAL_SIMILARITY]  # Default
+        if recommendation_types:
+            rec_types = []
+            for rt in recommendation_types.split(','):
+                rt = rt.strip()
+                if rt in RecommendationType.__members__.values():
+                    rec_types.append(RecommendationType(rt))
+                else:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Invalid recommendation type: {rt}. Valid types: {list(RecommendationType.__members__.values())}"
+                    )
+        
+        # Parse interaction history
+        user_history = []
+        if interaction_history:
+            user_history = [item.strip() for item in interaction_history.split(',')]
+        
+        # Build budget range
+        budget_range = None
+        if budget_min is not None or budget_max is not None:
+            budget_range = {}
+            if budget_min is not None:
+                budget_range["min"] = budget_min
+            if budget_max is not None:
+                budget_range["max"] = budget_max
+        
+        # Build request
+        request = UserPreferenceRequest(
+            user_id=user_id,
+            user_interaction_history=user_history if user_history else None,
+            preferred_regions=region_prefs if region_prefs else None,
+            preferred_craft_types=craft_prefs if craft_prefs else None,
+            preferred_festivals=festival_prefs if festival_prefs else None,
+            budget_range=budget_range,
+            recommendation_types=rec_types,
+            limit=limit,
+            diversity_factor=diversity_factor
+        )
+        
+        logger.info(f"GET user recommendations for {user_id} with {len(rec_types)} recommendation types")
+        
+        response = await recommendation_service.get_user_recommendations(request)
+        
+        return response
+        
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(ve)}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error in GET user recommendations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"User recommendations failed: {str(e)}")
 
 # Seasonal and festival recommendations
 
@@ -165,28 +285,68 @@ async def get_current_seasonal_recommendations(
     region: Optional[str] = Query(None, description="Preferred region for festival items"),
     include_gifts: bool = Query(True, description="Include gift items"),
     include_decorative: bool = Query(True, description="Include decorative items"),
-    festival: Optional[str] = Query(None, description="Specific festival focus")
+    festival: Optional[str] = Query(None, description="Specific festival focus"),
+    upcoming_festivals: Optional[str] = Query(None, description="Comma-separated upcoming festivals"),
+    price_min: Optional[float] = Query(None, description="Minimum price filter"),
+    price_max: Optional[float] = Query(None, description="Maximum price filter")
 ):
     """
     GET endpoint for current seasonal recommendations
+    Enhanced with price filtering and upcoming festivals
     """
     try:
-        # Parse region
+        # Parse region with validation
         region_preference = None
-        if region and region in IndianRegion.__members__.values():
-            region_preference = IndianRegion(region)
+        if region:
+            if region in IndianRegion.__members__.values():
+                region_preference = IndianRegion(region)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid region: {region}. Valid regions: {list(IndianRegion.__members__.values())}"
+                )
         
-        # Parse festival
+        # Parse festival with validation
         festival_preference = None
-        if festival and festival in Festival.__members__.values():
-            festival_preference = Festival(festival)
+        if festival:
+            if festival in Festival.__members__.values():
+                festival_preference = Festival(festival)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid festival: {festival}. Valid festivals: {list(Festival.__members__.values())}"
+                )
+        
+        # Parse upcoming festivals
+        upcoming_festival_list = []
+        if upcoming_festivals:
+            for fest in upcoming_festivals.split(','):
+                fest = fest.strip()
+                if fest in Festival.__members__.values():
+                    upcoming_festival_list.append(Festival(fest))
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid upcoming festival: {fest}. Valid festivals: {list(Festival.__members__.values())}"
+                    )
+        
+        # Build price range
+        price_range = None
+        if price_min is not None or price_max is not None:
+            price_range = {}
+            if price_min is not None:
+                price_range["min"] = price_min
+            if price_max is not None:
+                price_range["max"] = price_max
         
         # Build request
         request = SeasonalRecommendationRequest(
             current_festival=festival_preference,
+            upcoming_festivals=upcoming_festival_list if upcoming_festival_list else None,
             region_preference=region_preference,
             include_gift_items=include_gifts,
             include_decorative=include_decorative,
+            price_range=price_range,
             limit=limit
         )
         
@@ -196,6 +356,8 @@ async def get_current_seasonal_recommendations(
         
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(ve)}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Error in GET seasonal recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Seasonal recommendations failed: {str(e)}")
@@ -208,7 +370,9 @@ async def discover_regional_crafts(
     limit: int = Query(10, ge=1, le=30, description="Number of items to discover"),
     craft_types: Optional[str] = Query(None, description="Comma-separated craft types to focus on"),
     exclude_common: bool = Query(True, description="Exclude very common items"),
-    cultural_depth: float = Query(0.5, ge=0.0, le=1.0, description="Focus on traditional vs contemporary")
+    cultural_depth: float = Query(0.5, ge=0.0, le=1.0, description="Focus on traditional vs contemporary"),
+    price_min: Optional[float] = Query(None, description="Minimum price filter"),
+    price_max: Optional[float] = Query(None, description="Maximum price filter")
 ):
     """
     Discover crafts from a specific Indian region
@@ -222,22 +386,40 @@ async def discover_regional_crafts(
     try:
         # Validate region
         if region not in IndianRegion.__members__.values():
-            raise HTTPException(status_code=400, detail=f"Invalid region: {region}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid region: {region}. Valid regions: {list(IndianRegion.__members__.values())}"
+            )
         
         region_enum = IndianRegion(region)
         
-        # Parse craft types if provided
+        # Parse craft types if provided with validation
         craft_type_filters = []
         if craft_types:
             for ct in craft_types.split(','):
                 ct = ct.strip()
                 if ct in CraftType.__members__.values():
                     craft_type_filters.append(CraftType(ct))
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid craft type: {ct}. Valid types: {list(CraftType.__members__.values())}"
+                    )
+        
+        # Build budget range
+        budget_range = None
+        if price_min is not None or price_max is not None:
+            budget_range = {}
+            if price_min is not None:
+                budget_range["min"] = price_min
+            if price_max is not None:
+                budget_range["max"] = price_max
         
         # Create a user preference request focused on regional discovery
         request = UserPreferenceRequest(
             preferred_regions=[region_enum],
             preferred_craft_types=craft_type_filters if craft_type_filters else None,
+            budget_range=budget_range,
             recommendation_types=[RecommendationType.REGIONAL_DISCOVERY],
             limit=limit,
             diversity_factor=cultural_depth
@@ -249,9 +431,71 @@ async def discover_regional_crafts(
         
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(ve)}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Error in regional discovery: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Regional discovery failed: {str(e)}")
+
+# Cross-cultural discovery endpoint (NEW)
+
+@router.get("/cross-cultural/{source_region}")
+async def discover_cross_cultural_items(
+    source_region: str,
+    limit: int = Query(10, ge=1, le=30, description="Number of cross-cultural recommendations"),
+    craft_type: Optional[str] = Query(None, description="Focus on specific craft type"),
+    cultural_distance: float = Query(0.5, ge=0.0, le=1.0, description="Cultural similarity threshold"),
+    exclude_neighboring: bool = Query(False, description="Exclude neighboring regions")
+):
+    """
+    Discover items from different regions with similar craft traditions
+    
+    This endpoint promotes cross-cultural discovery by finding:
+    - Similar crafts from different regions
+    - Cultural connections across India
+    - Diverse regional interpretations of traditional techniques
+    """
+    try:
+        # Validate source region
+        if source_region not in IndianRegion.__members__.values():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid source region: {source_region}. Valid regions: {list(IndianRegion.__members__.values())}"
+            )
+        
+        source_region_enum = IndianRegion(source_region)
+        
+        # Parse craft type if provided
+        craft_type_filter = None
+        if craft_type:
+            if craft_type in CraftType.__members__.values():
+                craft_type_filter = CraftType(craft_type)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid craft type: {craft_type}. Valid types: {list(CraftType.__members__.values())}"
+                )
+        
+        # Create request for cross-cultural discovery
+        request = UserPreferenceRequest(
+            preferred_regions=[source_region_enum],  # Source region for comparison
+            preferred_craft_types=[craft_type_filter] if craft_type_filter else None,
+            recommendation_types=[RecommendationType.CROSS_CULTURAL],
+            limit=limit,
+            diversity_factor=cultural_distance
+        )
+        
+        response = await recommendation_service.get_user_recommendations(request)
+        
+        return response
+        
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(ve)}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error in cross-cultural discovery: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cross-cultural discovery failed: {str(e)}")
 
 # Batch recommendation endpoints
 
@@ -366,6 +610,16 @@ async def get_recommendation_analytics():
             "error": str(e)
         }
 
+@router.get("/performance")
+async def get_recommendation_performance():
+    """Get detailed recommendation service performance metrics"""
+    try:
+        report = await recommendation_service.get_recommendation_performance_report()
+        return report
+    except Exception as e:
+        logger.error(f"Error getting performance report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Performance report failed: {str(e)}")
+
 @router.get("/health")
 async def recommendation_health_check():
     """Health check for recommendation service functionality"""
@@ -380,10 +634,14 @@ async def recommendation_health_check():
             "cache_operational": True,
             "cultural_analysis_available": True,
             "content_based_engine_ready": True,
+            "collaborative_filtering_ready": True,
             "stats": {
                 "total_served": stats.get("recommendations_served", 0),
                 "avg_response_time_ms": stats.get("avg_response_time_ms", 0.0),
-                "cache_size": stats.get("cache_size", 0)
+                "cache_size": stats.get("cache_size", 0),
+                "cultural_cache_size": stats.get("cultural_cache_size", 0),
+                "collaborative_recommendations": stats.get("collaborative_recommendations", 0),
+                "seasonal_recommendations": stats.get("seasonal_recommendations", 0)
             }
         }
         
@@ -412,6 +670,16 @@ async def get_similarity_config():
         logger.error(f"Error getting similarity config: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Config retrieval failed: {str(e)}")
 
+@router.post("/optimize")
+async def optimize_recommendation_service():
+    """Optimize recommendation service performance"""
+    try:
+        result = await recommendation_service.optimize_performance()
+        return result
+    except Exception as e:
+        logger.error(f"Error optimizing service: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+
 @router.delete("/cache")
 async def clear_recommendation_cache():
     """Clear recommendation service cache"""
@@ -420,7 +688,7 @@ async def clear_recommendation_cache():
         
         return {
             "status": "cache_cleared",
-            "message": "Recommendation service cache cleared successfully"
+            "message": "All recommendation service caches cleared successfully"
         }
         
     except Exception as e:
@@ -437,27 +705,49 @@ async def explore_by_craft_type(
     craft_type: str = Query(..., description="Craft type to explore"),
     limit: int = Query(15, ge=1, le=50, description="Number of items"),
     region_preference: Optional[str] = Query(None, description="Preferred region"),
-    traditional_focus: float = Query(0.7, ge=0.0, le=1.0, description="Traditional vs contemporary balance")
+    traditional_focus: float = Query(0.7, ge=0.0, le=1.0, description="Traditional vs contemporary balance"),
+    price_min: Optional[float] = Query(None, description="Minimum price filter"),
+    price_max: Optional[float] = Query(None, description="Maximum price filter")
 ):
     """
     Explore items by specific craft type with cultural context
+    Enhanced with price filtering
     """
     try:
         # Validate craft type
         if craft_type not in CraftType.__members__.values():
-            raise HTTPException(status_code=400, detail=f"Invalid craft type: {craft_type}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid craft type: {craft_type}. Valid types: {list(CraftType.__members__.values())}"
+            )
         
         craft_enum = CraftType(craft_type)
         
-        # Parse region preference
+        # Parse region preference with validation
         region_enum = None
-        if region_preference and region_preference in IndianRegion.__members__.values():
-            region_enum = IndianRegion(region_preference)
+        if region_preference:
+            if region_preference in IndianRegion.__members__.values():
+                region_enum = IndianRegion(region_preference)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid region: {region_preference}. Valid regions: {list(IndianRegion.__members__.values())}"
+                )
+        
+        # Build budget range
+        budget_range = None
+        if price_min is not None or price_max is not None:
+            budget_range = {}
+            if price_min is not None:
+                budget_range["min"] = price_min
+            if price_max is not None:
+                budget_range["max"] = price_max
         
         # Create user preference request focused on craft type
         request = UserPreferenceRequest(
             preferred_craft_types=[craft_enum],
             preferred_regions=[region_enum] if region_enum else None,
+            budget_range=budget_range,
             recommendation_types=[RecommendationType.CULTURAL_SIMILARITY],
             limit=limit,
             diversity_factor=1.0 - traditional_focus  # Higher traditional focus = lower diversity
@@ -469,9 +759,33 @@ async def explore_by_craft_type(
         
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=f"Invalid parameter: {str(ve)}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Error in craft type exploration: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Craft type exploration failed: {str(e)}")
+
+# Debug and testing endpoints
+
+@router.get("/debug/{item_id}")
+async def debug_item_recommendations(item_id: str):
+    """Debug endpoint for troubleshooting item recommendations"""
+    try:
+        debug_info = await recommendation_service.test_item_lookup(item_id)
+        return debug_info
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
+
+@router.post("/test-lookup/{item_id}")
+async def test_item_lookup(item_id: str):
+    """Enhanced test endpoint to debug item lookup with detailed information"""
+    try:
+        result = await recommendation_service.test_item_lookup(item_id)
+        return {"debug_info": result}
+    except Exception as e:
+        logger.error(f"Error in test lookup: {str(e)}")
+        return {"error": str(e), "item_id": item_id}
 
 # Helper functions for batch processing
 
