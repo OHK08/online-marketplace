@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,7 +21,7 @@ export const InventoryTable = () => {
   const [restockQuantity, setRestockQuantity] = useState(1);
   const [aiBoostingArtwork, setAiBoostingArtwork] = useState<Artwork | null>(null);
   const [aiBoostData, setAiBoostData] = useState<any>(null);
-  const [aiBoostError, setAiBoostError] = useState<boolean>(false);
+  const [aiBoostError, setAiBoostError] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -41,11 +41,7 @@ export const InventoryTable = () => {
         }
       } catch (error) {
         console.error('Error loading artworks:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load your artworks.',
-        });
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to load your artworks.' });
       } finally {
         setLoading(false);
       }
@@ -122,33 +118,38 @@ export const InventoryTable = () => {
     }
   };
 
- const handleAiBoost = async (artwork: Artwork) => {
-  setAiBoostingArtwork(artwork);
-  setAiBoostData(null);
-  setAiBoostError(false);
+  const handleAiBoost = async (artwork: Artwork) => {
+    setAiBoostingArtwork(artwork);
+    setAiBoostData(null);
+    setAiBoostError(null);
 
-  try {
-    const imageUrl = artwork.media?.[0]?.url;
-    if (!imageUrl) {
-      throw new Error("No image found for artwork.");
+    try {
+      const imageUrl = artwork.media?.[0]?.url;
+      if (!imageUrl) throw new Error("No image found for artwork.");
+
+      const response = await fetch(imageUrl);
+      const imageBlob = await response.blob();
+
+      const [purchaseResp, fulfillmentResp] = await Promise.all([
+        visionAiService.purchaseAnalysis(imageBlob),
+        visionAiService.orderFulfillment(imageBlob)
+      ]);
+
+      if (!purchaseResp.success && !fulfillmentResp.success) {
+        throw new Error(purchaseResp.error || fulfillmentResp.error || "Unknown AI error");
+      }
+
+      setAiBoostData({
+        cart_suggestions: purchaseResp.data?.cart_suggestions || [],
+        purchase_analysis: purchaseResp.data?.purchase_analysis || '',
+        packaging_suggestions: fulfillmentResp.data?.packaging_suggestions || [],
+        shipping_considerations: fulfillmentResp.data?.shipping_considerations || ''
+      });
+    } catch (err: any) {
+      console.error("AI Boost error:", err);
+      setAiBoostError(err.message || "Failed to fetch AI Boost data");
     }
-
-    // Fetch the image and convert to Blob
-    const response = await fetch(imageUrl);
-    const imageBlob = await response.blob();
-
-    // Run API calls directly (removed timeout logic)
-    const [purchaseAnalysis, fulfillmentAnalysis] = await Promise.all([
-      visionAiService.purchaseAnalysis(imageBlob),
-      visionAiService.orderFulfillment(imageBlob)
-    ]);
-
-    setAiBoostData({ ...purchaseAnalysis, ...fulfillmentAnalysis });
-  } catch (error) {
-    console.error("Error calling VisionAI APIs:", error);
-    setAiBoostError(true);
-  }
-};
+  };
 
   if (loading) return <Loader text="Loading your products..." />;
 
@@ -196,6 +197,7 @@ export const InventoryTable = () => {
                     <DialogContent className="max-w-md">
                       <DialogHeader>
                         <DialogTitle>Edit Artwork</DialogTitle>
+                        <DialogDescription>Update product details here.</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
@@ -316,29 +318,29 @@ export const InventoryTable = () => {
 
               {/* AI Boost */}
               <TableCell>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleAiBoost(artwork)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => handleAiBoost(artwork)}>
                   <TrendingUp className="w-4 h-4 text-green-600" />
                 </Button>
-
                 <Dialog
                   open={!!aiBoostingArtwork}
                   onOpenChange={(open) => {
                     if (!open) {
                       setAiBoostingArtwork(null);
                       setAiBoostData(null);
-                      setAiBoostError(false);
+                      setAiBoostError(null);
                     }
                   }}
                 >
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent
+                    className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
+               w-[600px] max-w-full h-[70vh] bg-white rounded-lg shadow-lg
+               overflow-y-auto p-6
+               "
+                    style={{ backgroundColor: 'white', zIndex: 50 }}
+                  >
+                    <div className="fixed inset-0 z-40"></div>
                     <DialogHeader>
-                      <DialogTitle>
-                        AI Boost for: {aiBoostingArtwork?.title}
-                      </DialogTitle>
+                      <DialogTitle>AI Boost for: {aiBoostingArtwork?.title}</DialogTitle>
                     </DialogHeader>
 
                     {aiBoostingArtwork?.media?.[0]?.url && (
@@ -353,57 +355,48 @@ export const InventoryTable = () => {
 
                     {aiBoostData ? (
                       <div className="space-y-4">
-                        <div>
-                          <h4 className="font-semibold">Suggested Items to Sell:</h4>
-                          <ul className="list-disc list-inside">
-                            {aiBoostData.cart_suggestions?.map((item: string, index: number) => (
-                              <li key={index}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
+                        {/* Purchase Analysis */}
+                        {aiBoostData.purchase_analysis && (
+                          <div>
+                            <h4 className="font-semibold">AI Purchase Analysis:</h4>
+                            <p className="text-muted-foreground">{aiBoostData.purchase_analysis}</p>
+                          </div>
+                        )}
 
-                        <div>
-                          <h4 className="font-semibold">Packaging Suggestions:</h4>
-                          <ul className="list-disc list-inside">
-                            {aiBoostData.packaging_suggestions?.map((item: string, index: number) => (
-                              <li key={index}>{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold">Shipping Considerations:</h4>
-                          <p className="text-muted-foreground">
-                            {aiBoostData.shipping_considerations}
-                          </p>
-                        </div>
+                        {/* Suggested Complementary Items */}
+                        {aiBoostData.cart_suggestions?.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold">Suggested Complementary Items:</h4>
+                            <ul className="list-disc list-inside">
+                              {aiBoostData.cart_suggestions.map((item: string, index: number) => (
+                                <li key={index}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {/* Packaging Suggestions */}
+                        {aiBoostData.packaging_suggestions?.length > 0 && (
+                          <div>
+                            <h4 className="font-semibold">Packaging Suggestions:</h4>
+                            <ul className="list-disc list-inside">
+                              {aiBoostData.packaging_suggestions.map((item: string, index: number) => (
+                                <li key={index}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {/* Shipping Considerations */}
+                        {aiBoostData.shipping_considerations && (
+                          <div>
+                            <h4 className="font-semibold">Shipping Considerations:</h4>
+                            <p className="text-muted-foreground">{aiBoostData.shipping_considerations}</p>
+                          </div>
+                        )}
                       </div>
                     ) : aiBoostError ? (
-                      <div className="space-y-4">
-                        <div>
-                          <h4 className="font-semibold">Suggested Items to Sell:</h4>
-                          <ul className="list-disc list-inside">
-                            <li key="1">Complementary artwork prints</li>
-                            <li key="2">Custom frames for this piece</li>
-                            <li key="3">Art-themed merchandise (e.g., mugs, posters)</li>
-                          </ul>
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold">Packaging Suggestions:</h4>
-                          <ul className="list-disc list-inside">
-                            <li key="1">Use acid-free tissue paper for protection</li>
-                            <li key="2">Include a sturdy cardboard backing</li>
-                            <li key="3">Seal in a waterproof sleeve</li>
-                          </ul>
-                        </div>
-
-                        <div>
-                          <h4 className="font-semibold">Shipping Considerations:</h4>
-                          <p className="text-muted-foreground">
-                            Ensure fragile items are marked clearly and use a reliable courier with tracking.
-                          </p>
-                        </div>
+                      <div className="text-red-500 text-center py-8">
+                        <p className="font-semibold">AI Boost failed</p>
+                        <p className="text-sm text-muted-foreground">{aiBoostError}</p>
                       </div>
                     ) : (
                       <div className="flex justify-center py-8">

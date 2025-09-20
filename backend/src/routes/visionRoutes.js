@@ -23,7 +23,7 @@ router.post("/purchase-analysis", upload.single("image"), visionController.purch
 router.post("/fraud-detection", upload.single("image"), visionController.fraudDetection);
 
 // POST /api/vision/order_fulfillment_analysis
-router.post("/order-fulfillment_analysis", upload.single("image"), visionController.orderFulfillment);
+router.post("/order_fulfillment_analysis", upload.single("image"), visionController.orderFulfillment);
 
 // POST /api/vision/quality_predictions
 router.post("/quality-predictions", upload.single("image"), visionController.qualityPredictions);

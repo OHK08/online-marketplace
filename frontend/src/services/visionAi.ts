@@ -59,7 +59,7 @@ export const visionAiService = {
   },
 
   async orderFulfillment(file: File | Blob): Promise<VisionResponse> {
-    return postImage("/vision/order-fulfillment_analysis", file);
+    return postImage("/vision/order_fulfillment_analysis", file);
   },
 
   async qualityPredictions(file: File | Blob): Promise<VisionResponse> {
