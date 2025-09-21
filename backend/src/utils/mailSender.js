@@ -1,17 +1,17 @@
 const nodemailer = require("nodemailer");
+const sgTransport = require("nodemailer-sendgrid");
 
 const mailSender = async (email, title, body) => {
   try {
-    const transporter = nodemailer.createTransport({
-      service: "SendGrid",
-      auth: {
-        user: "apikey", // this is fixed string for SendGrid
-        pass: process.env.SENDGRID_API_KEY,
-      },
-    });
+    // Use SendGrid API transport (HTTPS, no SMTP)
+    let transporter = nodemailer.createTransport(
+      sgTransport({
+        apiKey: process.env.SENDGRID_API_KEY,
+      })
+    );
 
     let info = await transporter.sendMail({
-      from: `Online MarketPlace <${process.env.MAIL_USER}>`,
+      from: `"Online MarketPlace" <${process.env.MAIL_USER}>`,
       to: email,
       subject: title,
       html: body,
