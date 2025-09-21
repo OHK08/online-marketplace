@@ -77,7 +77,7 @@ const ProfilePage = () => {
                   <Edit className="w-4 h-4" />
                   Edit Profile
                 </Button>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md" aria-describedby="">
                   <DialogHeader>
                     <DialogTitle>Edit Profile</DialogTitle>
                   </DialogHeader>

@@ -244,7 +244,7 @@ const OrderHistoryPage = () => {
                           View Details
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="max-w-2xl" aria-describedby="">
                         <DialogHeader>
                           <DialogTitle>Order Details</DialogTitle>
                         </DialogHeader>

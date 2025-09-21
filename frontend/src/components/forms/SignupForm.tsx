@@ -88,6 +88,9 @@ export const SignupForm = () => {
               'Send OTP'
             )}
           </Button>
+          <p style={{ fontSize: '0.85rem', color: '#6B7280', display: 'block', marginTop: '0.25rem' }}>
+            Check your spam folder for OTP
+          </p> 
         </div>
       </Form>
     );
