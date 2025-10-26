@@ -48,6 +48,20 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
+    // SYNC: Update artistName in all artworks if name was changed
+    if (name && name !== user.name) {
+      try {
+        await Artwork.updateMany(
+          { artistId: userId },
+          { $set: { artistName: name } }
+        );
+        console.log(`Updated artistName for all artworks by user ${userId}`);
+      } catch (syncErr) {
+        console.error('Error syncing artistName to artworks:', syncErr);
+        // Don't fail the request if sync fails, just log it
+      }
+    }
+
     res.json({ success: true, message: "Profile updated", user });
   } catch (err) {
     console.error("Error in updateProfile:", err);
@@ -86,11 +100,15 @@ exports.getSellerStats = async (req, res) => {
 
     // 3. Aggregation: only include PAID orders, then unwind items
     const stats = await Order.aggregate([
-      { $match: { createdAt: { $gte: lastMonth } } },
+      { 
+        $match: { 
+          createdAt: { $gte: lastMonth },
+          status: { $in: ['paid', 'shipped', 'out_for_delivery', 'delivered'] }
+        } 
+      },
       { $unwind: "$items" },
       {
         $match: {
-          // Handle both ObjectId and string storage
           $expr: {
             $eq: [
               "$items.sellerId",
@@ -104,7 +122,7 @@ exports.getSellerStats = async (req, res) => {
       {
         $group: {
           _id: null,
-          totalOrders: { $sum: 1 }, // count each item as an order line
+          totalOrders: { $sum: 1 },
           totalRevenue: {
             $sum: { $multiply: ["$items.qty", "$items.unitPrice"] },
           },

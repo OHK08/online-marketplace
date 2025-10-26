@@ -1,5 +1,6 @@
 // backend/src/controllers/artworkController.js
 const Artwork = require("../models/Artwork");
+const User = require("../models/User");
 const mongoose = require("mongoose");
 const { cloudinary } = require("../config/cloudinary");
 
@@ -14,12 +15,18 @@ exports.createArtwork = async (req, res) => {
         message: "Title and price are required",
       });
     }
+
     let media = (req.files || []).map((file) => ({
       url: file.path,
       type: file.mimetype.startsWith("video") ? "video" : "image",
       sizeBytes: file.size,
       storageKey: file.filename,
     }));
+
+    // Get artist name for denormalization
+    const artist = await User.findById(req.user.id).select('name');
+    const artistName = artist?.name || '';
+
     const artwork = await Artwork.create({
       artistId: req.user.id,
       title,
@@ -28,9 +35,11 @@ exports.createArtwork = async (req, res) => {
       currency: currency || "INR",
       quantity: quantity || 1,
       status: status || "draft",
-      tags: tags || [], // save tags
+      tags: tags || [],
+      artistName, // Set artistName on creation
       media,
     });
+
     res.status(201).json({
       success: true,
       message: "Artwork posted successfully",
@@ -153,26 +162,32 @@ exports.myArtworks = async (req, res) => {
 exports.updateArtwork = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, price, currency, quantity, status, tags } = req.body; // include tags
+    const { title, description, price, currency, quantity, status, tags } = req.body;
+    
     const artwork = await Artwork.findById(id);
     if (!artwork) return res.status(404).json({ success: false, message: "Artwork not found" });
+    
     if (artwork.artistId.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
+    
     if (artwork.status !== "draft") {
       return res.status(400).json({
         success: false,
         message: "Only artworks in draft state can be edited",
       });
     }
+    
     if (title) artwork.title = title;
     if (description) artwork.description = description;
     if (price) artwork.price = price;
     if (currency) artwork.currency = currency;
     if (quantity) artwork.quantity = quantity;
     if (status) artwork.status = status;
-    if (tags) artwork.tags = tags; // update tags
+    if (tags) artwork.tags = tags;
+    
     await artwork.save();
+    
     res.json({
       success: true,
       message: "Artwork updated successfully",
@@ -191,8 +206,8 @@ exports.updateArtwork = async (req, res) => {
 // ------------------ RESTOCK ARTWORK ------------------
 exports.restockArtwork = async (req, res) => {
   try {
-    const { id } = req.params; // artwork ID
-    const { quantity } = req.body; // new quantity to add
+    const { id } = req.params;
+    const { quantity } = req.body;
 
     if (!quantity || quantity <= 0) {
       return res.status(400).json({
@@ -207,15 +222,12 @@ exports.restockArtwork = async (req, res) => {
       return res.status(404).json({ success: false, message: "Artwork not found" });
     }
 
-    // Only the seller/artist can restock
     if (artwork.artistId.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
 
-    // increase quantity
     artwork.quantity += Number(quantity);
 
-    // if previously out_of_stock or removed, publish it again
     if (artwork.status === "out_of_stock" || artwork.status === "removed") {
       artwork.status = "published";
     }

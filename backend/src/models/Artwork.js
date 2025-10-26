@@ -29,7 +29,19 @@ const ArtworkSchema = new Schema({
   },
   likeCount: { type: Number, default: 0 },
 
-  // New field for festive filtering - tags
+  // Denormalized fields for search and recommendations
+  artistName: { 
+    type: String, 
+    trim: true,
+    index: true 
+  },
+  purchaseCount: { 
+    type: Number, 
+    default: 0,
+    index: true 
+  },
+
+  // Tags for festive filtering
   tags: {
     type: [String],
     default: [],

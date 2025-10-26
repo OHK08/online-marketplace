@@ -14,13 +14,11 @@ exports.addToCart = async (req, res) => {
     if (!artworkId) return res.status(400).json({ success: false, message: "artworkId is required" });
     if (Number.isNaN(qty) || qty <= 0) qty = 1;
 
-    // check artwork
     const artwork = await Artwork.findById(artworkId);
     if (!artwork || artwork.status !== "published") {
       return res.status(404).json({ success: false, message: "Artwork not available" });
     }
 
-    // find/create cart
     let cart = await Cart.findOne({ userId });
     if (!cart) cart = new Cart({ userId, items: [] });
 
@@ -118,13 +116,20 @@ exports.updateCartItem = async (req, res) => {
 exports.createOrderFromCart = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { shippingAddress } = req.body;
+    
+    // Validate shipping address
+    if (!shippingAddress) {
+      return res.status(400).json({ success: false, message: "Shipping address is required" });
+    }
+
     const cart = await Cart.findOne({ userId }).populate("items.artworkId");
 
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ success: false, message: "Cart is empty" });
     }
 
-    // group by seller
+    // Group by seller
     const groups = {};
     for (const item of cart.items) {
       const sellerId = item.artworkId.artistId.toString();
@@ -152,7 +157,7 @@ exports.createOrderFromCart = async (req, res) => {
           qty: item.qty,
           unitPrice: item.artworkId.price,
           currency: item.artworkId.currency,
-          sellerId: item.artworkId.artistId, // add sellerId here
+          sellerId: item.artworkId.artistId,
         });
 
         total += item.artworkId.price * item.qty;
@@ -164,15 +169,15 @@ exports.createOrderFromCart = async (req, res) => {
       const razorpayOrder = await instance.orders.create({
         amount: total * 100,
         currency: "INR",
-        receipt: `cart_${shortUserId}_${shortSellerId}_${Date.now()}`.slice(0, 39), // ensure <40
+        receipt: `cart_${shortUserId}_${shortSellerId}_${Date.now()}`.slice(0, 39),
       });
 
       const order = await Order.create({
         buyerId: userId,
-        sellerId,
         items: orderItems,
         total,
         currency: "INR",
+        shippingAddress,
         razorpayOrderId: razorpayOrder.id,
         status: "created",
       });
@@ -214,20 +219,25 @@ exports.verifyCartPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Order ID mismatch" });
     }
 
-    // Update order with payment details
     order.razorpayPaymentId = razorpayPaymentId;
     order.razorpaySignature = razorpaySignature;
     order.status = "paid";
     await order.save();
 
-    // reduce stock
+    // Reduce stock and SYNC: increment purchaseCount
     for (const item of order.items) {
       const updatedArtwork = await Artwork.findByIdAndUpdate(
         item.artworkId,
-        { $inc: { quantity: -item.qty } },
+        { 
+          $inc: { 
+            quantity: -item.qty,
+            purchaseCount: item.qty  // SYNC: Increment purchase count
+          } 
+        },
         { new: true }
       );
-      if (updatedArtwork && updatedArtwork.quantity === 0) {
+      
+      if (updatedArtwork && updatedArtwork.quantity <= 0) {
         updatedArtwork.status = "out_of_stock";
         await updatedArtwork.save();
       }
