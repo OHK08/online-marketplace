@@ -1,14 +1,14 @@
-# genai-services/src/vision_ai/services/vision_service.py
-import os
+import os 
 import base64
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import json
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import google.generativeai as genai
 from ..processors.image_processor import preprocess_image
-from ..prompts.prompt_engineering import get_story_prompt
-import logging
-import json
+from ..prompts.prompt_engineering import get_story_prompt, generate_video_from_story
+from ..jobs.job_manager import create_job, get_job_status, update_job_sync
+import logging 
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,7 @@ load_dotenv()
 # Configure Google API
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
-    raise RuntimeError("❌ GOOGLE_API_KEY not found in .env")
+    raise RuntimeError("GOOGLE_API_KEY not found in .env")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # FastAPI app setup
@@ -47,25 +47,14 @@ def _get_gemini_model():
 
 @app.post("/generate_story")
 async def generate_story(image: UploadFile):
-    try:
-        # Log filename
+    try: 
         logger.info(f"Received file: {image.filename}, content type: {image.content_type}")
-
-        # Read image
-        image_bytes = await image.read()
+        image_bytes = await image.read() 
         if not image_bytes:
             raise HTTPException(status_code=400, detail=f"No image data provided for file: {image.filename}")
-
-        # Log image size
-        logger.info(f"Image size: {len(image_bytes)} bytes")
-
-        # Preprocess image
-        processed_bytes = preprocess_image(image_bytes)
-
-        # Configure Gemini model
-        model = _get_gemini_model()
-
-        # Convert to base64 for Gemini
+        logger.info(f"Image size: {len(image_bytes)} bytes") 
+        processed_bytes = preprocess_image(image_bytes) 
+        model = _get_gemini_model() 
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
 
@@ -73,7 +62,7 @@ async def generate_story(image: UploadFile):
         analysis_prompt = "Analyze this craft image: identify the craft type (e.g., pottery, basket, weaving), estimate the skill level (beginner, intermediate, expert), and describe the main craft technique (e.g., wheel-throwing, coiling, weaving). Return ONLY a JSON object with 'craft_type', 'skill_level', and 'craft_technique'."
         analysis_response = model.generate_content([analysis_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         analysis_text = analysis_response.text
-        logger.info(f"Raw analysis: {analysis_text}")  # Log raw analysis
+        logger.info(f"Raw analysis: {analysis_text}")
         try:
             analysis = json.loads(analysis_text)
             craft_type = analysis.get('craft_type', "pottery")
@@ -86,15 +75,12 @@ async def generate_story(image: UploadFile):
             logger.warning("Invalid JSON from analysis - using defaults")
 
         # Dynamic prompt with detected craft type
-        prompt = get_story_prompt(craft_type=craft_type, language="English", tone="warm, respectful")
-
-        # Send to Gemini with JSON config
+        prompt = get_story_prompt(craft_type=craft_type, language="English", tone="warm, respectful") 
         response = model.generate_content([prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         story_text = response.text
-        logger.info(f"Raw story: {story_text}")  # Log raw story
-        try:
-            sections = json.loads(story_text)
-            # Check completeness
+        logger.info(f"Raw story: {story_text}")
+        try: 
+            sections = json.loads(story_text) 
             if all(key in sections for key in ['title', 'narrative', 'tutorial', 'categories']):
                 sections['craft_type'] = craft_type
                 sections['skill_level'] = skill_level
@@ -104,6 +90,7 @@ async def generate_story(image: UploadFile):
                 logger.warning("Incomplete JSON from Gemini - using fallback")
         except json.JSONDecodeError:
             logger.warning("Invalid JSON from Gemini - using fallback")
+
         # Fallback if JSON fails
         sections = {
             "title": f"Story of {craft_type}",
@@ -123,25 +110,53 @@ async def generate_story(image: UploadFile):
         logger.error(f"General error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
 
+# ==================== ASYNC VIDEO GENERATION (NEW) ====================
+
+@app.post("/generate_video")
+async def generate_video(image: UploadFile, background_tasks: BackgroundTasks):
+    """
+    Upload image → queue story + video → return job_id
+    """
+    try:
+        story_response = await generate_story(image)
+        story_json = json.dumps(story_response)
+        job_id = await create_job(story_response)
+        background_tasks.add_task(run_video_generation, job_id, story_json)
+        return {"job_id": job_id, "status": "queued"}
+    except Exception as e:
+        logger.error(f"Job creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to queue job: {str(e)}")
+
+
+def run_video_generation(job_id: str, story_json: str):
+    """Background task: generate video and update DB"""
+    try:
+        video_path = generate_video_from_story(story_json)
+        update_job_sync(job_id, {"status": "done", "video_path": video_path})
+    except Exception as e:
+        update_job_sync(job_id, {"status": "failed", "error": str(e)})
+
+
+@app.get("/video-status/{job_id}")
+async def video_status(job_id: str):
+    """Poll job status"""
+    job = await get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+# ==================== ALL ORIGINAL ENDPOINTS (UNCHANGED) ====================
+
 @app.post("/similar_crafts")
 async def similar_crafts(image: UploadFile):
-    try:
-        # Read image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
-            raise HTTPException(status_code=400, detail=f"No image data provided for file: {image.filename}")
-
-        # Preprocess image
+            raise HTTPException(status_code=400, detail=f"No image data provided for file: {image.filename}") 
         processed_bytes = preprocess_image(image_bytes)
-
-        # Configure Gemini model
-        model = _get_gemini_model()
-
-        # Convert to base64 for Gemini
+        model = _get_gemini_model() 
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
-        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Analyze for similarity features
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}] 
         similarity_prompt = "Analyze this craft image and suggest 3 similar crafts based on visual features (e.g., shape, texture, color). Return ONLY a JSON object with 'similar_crafts' as a list of 3 strings with brief descriptions."
         similarity_response = model.generate_content([similarity_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         similarity_text = similarity_response.text
@@ -160,8 +175,7 @@ async def similar_crafts(image: UploadFile):
                 "handwoven basket: Natural texture, round design.",
                 "clay vase: Earthy tones, handcrafted look."
             ]
-        }
-
+        } 
     except ValueError as ve:
         logger.error(f"Image processing error: {str(ve)}")
         raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
@@ -171,19 +185,14 @@ async def similar_crafts(image: UploadFile):
 
 @app.post("/price_suggestion")
 async def price_suggestion(image: UploadFile):
-    try:
-        # Read and preprocess image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
             raise HTTPException(status_code=400, detail="No image data provided")
         processed_bytes = preprocess_image(image_bytes)
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Configure Gemini
-        model = _get_gemini_model()
-
-        # Prompt for price suggestion and market analysis
+        model = _get_gemini_model() 
         price_prompt = "Analyze this craft image: identify craft type, technique, skill level. Suggest a price range (₹) based on similar items (e.g., handmade pottery ₹500-2000). Provide market analysis (e.g., demand trends). Return ONLY a JSON object with 'price_range' (string, e.g., '₹1,200-1,800'), 'market_analysis' (100-150 words), 'reasoning' (brief)."
         response = model.generate_content([price_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         price_text = response.text
@@ -206,19 +215,14 @@ async def price_suggestion(image: UploadFile):
 
 @app.post("/complementary_products")
 async def complementary_products(image: UploadFile):
-    try:
-        # Read and preprocess image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
             raise HTTPException(status_code=400, detail="No image data provided")
         processed_bytes = preprocess_image(image_bytes)
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
-        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Configure Gemini
-        model = _get_gemini_model()
-
-        # Prompt for complementary analysis
+        image_parts = [{"mime_type": "image/jpeg", "data": base64_image}] 
+        model = _get_gemini_model() 
         comp_prompt = "Analyze this craft image: identify craft type, technique. Suggest 3 complementary products (e.g., glaze for pottery) with brief descriptions. Return ONLY a JSON object with 'complementary_products' as a list of 3 strings with descriptions."
         response = model.generate_content([comp_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         comp_text = response.text
@@ -247,19 +251,14 @@ async def complementary_products(image: UploadFile):
 
 @app.post("/purchase_analysis")
 async def purchase_analysis(image: UploadFile):
-    try:
-        # Read and preprocess image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
             raise HTTPException(status_code=400, detail="No image data provided")
         processed_bytes = preprocess_image(image_bytes)
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Configure Gemini
-        model = _get_gemini_model()
-
-        # Prompt for purchase platform analysis
+        model = _get_gemini_model() 
         purchase_prompt = "Analyze this craft image: identify craft type, technique. Suggest 3 items to add to the cart based on purchase patterns (e.g., glaze for pottery). Provide a brief analysis (50-100 words) on how this enhances the purchase experience. Return ONLY a JSON object with 'cart_suggestions' (list of 3 strings with descriptions) and 'purchase_analysis' (string, 50-100 words)."
         response = model.generate_content([purchase_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         purchase_text = response.text
@@ -289,19 +288,14 @@ async def purchase_analysis(image: UploadFile):
 
 @app.post("/fraud_detection")
 async def fraud_detection(image: UploadFile):
-    try:
-        # Read and preprocess image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
             raise HTTPException(status_code=400, detail="No image data provided")
         processed_bytes = preprocess_image(image_bytes)
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Configure Gemini
-        model = _get_gemini_model()
-
-        # Prompt for fraud detection
+        model = _get_gemini_model() 
         fraud_prompt = "Analyze this craft image: detect signs of fraud (e.g., stock photo, artificial lighting, inconsistent craftsmanship). Return ONLY a JSON object with 'is_fraudulent' (boolean), 'confidence_score' (0-1), and 'reasoning' (brief)."
         response = model.generate_content([fraud_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         fraud_text = response.text
@@ -328,19 +322,14 @@ async def fraud_detection(image: UploadFile):
 
 @app.post("/order_fulfillment_analysis")
 async def order_fulfillment_analysis(image: UploadFile):
-    try:
-        # Read and preprocess image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
             raise HTTPException(status_code=400, detail="No image data provided")
         processed_bytes = preprocess_image(image_bytes)
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Configure Gemini
-        model = _get_gemini_model()
-
-        # Prompt for order fulfillment analysis
+        model = _get_gemini_model() 
         fulfillment_prompt = "Analyze this craft image: identify craft type, size, and fragility. Suggest optimal packaging materials and shipping considerations (e.g., bubble wrap for pottery). Return ONLY a JSON object with 'packaging_suggestions' (list of 2-3 strings with descriptions) and 'shipping_considerations' (string, 50-100 words)."
         response = model.generate_content([fulfillment_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         fulfillment_text = response.text
@@ -369,19 +358,14 @@ async def order_fulfillment_analysis(image: UploadFile):
 
 @app.post("/quality_predictions")
 async def quality_predictions(image: UploadFile):
-    try:
-        # Read and preprocess image
+    try: 
         image_bytes = await image.read()
         if not image_bytes:
             raise HTTPException(status_code=400, detail="No image data provided")
         processed_bytes = preprocess_image(image_bytes)
         base64_image = base64.b64encode(processed_bytes).decode('utf-8')
         image_parts = [{"mime_type": "image/jpeg", "data": base64_image}]
-
-        # Configure Gemini
-        model = _get_gemini_model()
-
-        # Prompt for quality predictions
+        model = _get_gemini_model() 
         quality_prompt = "Analyze this craft image: assess craftsmanship quality (e.g., high, medium, low) based on detail, finish, and technique. Return ONLY a JSON object with 'quality_rating' (string: high/medium/low), 'confidence_score' (0-1), and 'reasoning' (brief)."
         response = model.generate_content([quality_prompt] + image_parts, generation_config=genai.GenerationConfig(response_mime_type="application/json"))
         quality_text = response.text
