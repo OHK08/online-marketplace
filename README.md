@@ -41,42 +41,10 @@ online-marketplace/
 │   ├── .gitignore             
 │   └── package.json
 │
-├── gift_ai_service/            # 🧠 AI-driven gift recommendation module
-│   ├── core/                   # Core logic & orchestrators
-│   │   ├── config.py
-│   │   ├── llm_client.py
-│   │   ├── orchestrator.py
-│   │   ├── vector_store.py
-│   │   └── __init__.py
-│   │
-│   ├── services/               # Service layer handling business logic
-│   │   ├── environment_service.py
-│   │   ├── gift_bundle_service.py
-│   │   ├── gift_intent_service.py
-│   │   ├── gift_prompt_templates.py
-│   │   ├── gift_retrieval_service.py
-│   │   ├── gift_validation_service.py
-│   │   └── __init__.py
-│   │
-│   ├── tests/                  # Unit & integration tests
-│   │   ├── test_gift_services.py
-│   │   ├── test_orchestrator.py
-│   │   ├── test_vector_store.py
-│   │   └── __init__.py
-│   │
-│   ├── venv/                   # Python virtual environment (ignored by Git)
-│   ├── __pycache__/            # Auto-generated Python cache
-│   ├── .env                    # Environment variables
-│   ├── .gitignore
-│   ├── debug_env.py
-│   ├── main.py                 # Entry point for AI service
-│   ├── requirements.txt        # Python dependencies
-│   ├── setup_gift_service.py   # Setup script
-│   └── vision_ai_service.py    # Vision-based gift analysis
-│
 ├── docs/                       # Documentation
 │
 ├── .gitignore                  # Root ignore file
 └── README.md
 
 ```
+
