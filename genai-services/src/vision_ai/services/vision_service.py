@@ -9,7 +9,7 @@ from ..processors.image_processor import preprocess_image
 from ..prompts.prompt_engineering import get_story_prompt, generate_video_from_story
 from ..jobs.job_manager import create_job, get_job_status, update_job_sync
 import logging 
-
+from ..video.video_generator import VeoGenerator
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -129,9 +129,9 @@ async def generate_video(image: UploadFile, background_tasks: BackgroundTasks):
 
 
 def run_video_generation(job_id: str, story_json: str):
-    """Background task: generate video and update DB"""
     try:
-        video_path = generate_video_from_story(story_json)
+        generator = VeoGenerator()
+        video_path = generator.generate_and_save(story_json)
         update_job_sync(job_id, {"status": "done", "video_path": video_path})
     except Exception as e:
         update_job_sync(job_id, {"status": "failed", "error": str(e)})
@@ -388,4 +388,37 @@ async def quality_predictions(image: UploadFile):
         raise HTTPException(status_code=400, detail=f"Image processing error: {str(ve)}")
     except Exception as e:
         logger.error(f"General error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}") 
+
+
+# ==============================================
+# NEW ADDITION — UPGRADED VIDEO PIPELINE (V2 PROMPT)
+# ==============================================
+
+from ..video.video_generator import generate_veo_video_with_v2_prompt
+
+def run_video_generation_v2(job_id: str, story_json: str):
+    """
+    Upgraded version using story_to_veo_prompt_v2() for cinematic 8s clips
+    """
+    try:
+        video_path = generate_veo_video_with_v2_prompt(story_json)
+        update_job_sync(job_id, {"status": "done", "video_path": video_path})
+    except Exception as e:
+        update_job_sync(job_id, {"status": "failed", "error": str(e)})
+
+
+@app.post("/generate_video_v2")
+async def generate_video_v2(image: UploadFile, background_tasks: BackgroundTasks):
+    """
+    NEW ENDPOINT: Uses V E O 3.1 + v2 prompt for richer animation
+    """
+    try:
+        story_response = await generate_story(image)
+        story_json = json.dumps(story_response)
+        job_id = await create_job(story_response)
+        background_tasks.add_task(run_video_generation_v2, job_id, story_json)
+        return {"job_id": job_id, "status": "queued", "version": "v2"}
+    except Exception as e:
+        logger.error(f"V2 Job creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to queue V2 job: {str(e)}")
