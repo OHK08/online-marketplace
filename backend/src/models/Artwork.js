@@ -29,24 +29,30 @@ const ArtworkSchema = new Schema({
   },
   likeCount: { type: Number, default: 0 },
 
-  // New field for festive filtering - tags
+  // Denormalized fields for search and recommendations
+  artistName: { 
+    type: String, 
+    trim: true,
+    index: true 
+  },
+  purchaseCount: { 
+    type: Number, 
+    default: 0,
+    index: true 
+  },
+
+  // Tags for festive filtering
   tags: {
     type: [String],
     default: [],
     index: true,
   },
 
-  // Vector embeddings for semantic search (used by GenAI vector store)
-  embedding: {
-    type: [Number], // float vector from OpenAI embedding or similar
-    index: "vector", // if using MongoDB Atlas Vector Search
-    dimensions: 1536, // depends on embedding model used
+  // Unix timestamp in milliseconds for update job
+  updatedAt_timestamp: {
+    type: Number,
+    index: true,
   },
-
-  // Meta tags for better intent matching
-  festival_tags: { type: [String], default: [] },
-  recipient_tags: { type: [String], default: [] },
-
 }, { timestamps: true });
 
 ArtworkSchema.index({ title: 'text', description: 'text', tags: 'text' });

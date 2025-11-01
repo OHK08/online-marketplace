@@ -1,0 +1,23 @@
+{
+  "contentsDeltaUri": "gs://online-marketplace/embeddings/",
+  "config": {
+    "dimensions": 1408,
+    "approximateNeighborsCount": 150,
+    "distanceMeasureType": "DOT_PRODUCT_DISTANCE",
+    "featureNormType": "NONE",
+    "shardSize": "SHARD_SIZE_SMALL",
+    "filterConfig": {  
+       "namespaces": [
+         {"namespace": "artistId", "type": "TOKEN"},
+         {"namespace": "tags", "type": "TOKEN"},
+         {"namespace": "status", "type": "TOKEN"},
+         {"namespace": "price", "type": "NUMERIC"},
+         {"namespace": "likeCount", "type": "NUMERIC"},
+         {"namespace": "purchaseCount", "type": "NUMERIC"}
+       ]
+     },
+    "algorithmConfig": {
+      "treeAhConfig": {}
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "deployedIndex": {
+    "id": "artworks_deployed_v1",
+    "displayName": "artworks-index-v1",
+    "index": "projects/529829749133/locations/asia-south1/indexes/2394234947993862144",
+    "automaticResources": {
+      "minReplicaCount": 2,
+      "maxReplicaCount": 2
+    },
+    "enablePublicEndpoint": true
+  }
+}
