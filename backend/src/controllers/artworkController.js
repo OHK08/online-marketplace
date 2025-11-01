@@ -3,7 +3,9 @@ const Artwork = require("../models/Artwork");
 const User = require("../models/User");
 const mongoose = require("mongoose");
 const { cloudinary } = require("../config/cloudinary");
+const giftAIService = require("../services/giftAIService");
 
+// ------------------ CREATE ARTWORK ------------------
 exports.createArtwork = async (req, res) => {
   try {
     console.log("=== CREATE ARTWORK DEBUG ===");
@@ -128,6 +130,17 @@ exports.createArtwork = async (req, res) => {
 
     console.log("Artwork created successfully:", artwork._id);
 
+    // 🎁 AUTO-INDEX: Index artwork in AI vector store if published
+    if (artwork.status === "published") {
+      try {
+        await giftAIService.indexArtwork(artwork);
+        console.log(`✅ Artwork ${artwork._id} indexed in AI vector store`);
+      } catch (error) {
+        console.error(`⚠️ Failed to index artwork ${artwork._id}:`, error.message);
+        // Don't fail the request if indexing fails
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: "Artwork posted successfully",
@@ -232,6 +245,9 @@ exports.deleteArtwork = async (req, res) => {
 
     await artwork.deleteOne();
 
+    // Note: Vector store cleanup would require additional API endpoint
+    // For now, deleted items will simply not be returned in searches
+
     res.json({
       success: true,
       message: "Artwork deleted successfully",
@@ -293,7 +309,6 @@ exports.updateArtwork = async (req, res) => {
     if (price) artwork.price = Number(price);
     if (currency) artwork.currency = currency;
     if (quantity) artwork.quantity = Number(quantity);
-    if (status) artwork.status = status;
     
     // Handle tags
     if (req.body.tags !== undefined) {
@@ -325,9 +340,32 @@ exports.updateArtwork = async (req, res) => {
       artwork.tags = tags;
     }
     
+    // Track status change for AI indexing
+    const wasPublished = artwork.status === "published";
+    if (status) artwork.status = status;
+    const isNowPublished = artwork.status === "published";
+    
     artwork.updatedAt_timestamp = Date.now();
     
     await artwork.save();
+    
+    // 🎁 AUTO-INDEX: Index if newly published or re-index if already published
+    if (isNowPublished && !wasPublished) {
+      try {
+        await giftAIService.indexArtwork(artwork);
+        console.log(`✅ Artwork ${artwork._id} indexed in AI vector store`);
+      } catch (error) {
+        console.error(`⚠️ Failed to index artwork ${artwork._id}:`, error.message);
+      }
+    } else if (isNowPublished && wasPublished) {
+      // Re-index if already published (content changed)
+      try {
+        await giftAIService.indexArtwork(artwork);
+        console.log(`♻️ Artwork ${artwork._id} re-indexed in AI vector store`);
+      } catch (error) {
+        console.error(`⚠️ Failed to re-index artwork ${artwork._id}:`, error.message);
+      }
+    }
     
     res.json({
       success: true,
@@ -371,6 +409,14 @@ exports.restockArtwork = async (req, res) => {
 
     if (artwork.status === "out_of_stock" || artwork.status === "removed") {
       artwork.status = "published";
+      
+      // 🎁 AUTO-INDEX: Re-index when restocking
+      try {
+        await giftAIService.indexArtwork(artwork);
+        console.log(`♻️ Artwork ${artwork._id} re-indexed after restocking`);
+      } catch (error) {
+        console.error(`⚠️ Failed to re-index artwork ${artwork._id}:`, error.message);
+      }
     }
 
     artwork.updatedAt_timestamp = Date.now();
