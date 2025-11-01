@@ -9,14 +9,12 @@ exports.likeArtwork = async (req, res) => {
     const { artworkId } = req.params;
     const userId = req.user.id;
 
-    // Check if already liked
+    // check if already liked
     const existingLike = await Like.findOne({ userId, artworkId });
 
     if (existingLike) {
       // Unlike
       await existingLike.deleteOne();
-      
-      // SYNC: Decrement likeCount (already implemented correctly)
       await Artwork.findByIdAndUpdate(artworkId, { $inc: { likeCount: -1 } });
       await User.findByIdAndUpdate(userId, { $pull: { likes: artworkId } });
 
@@ -27,8 +25,6 @@ exports.likeArtwork = async (req, res) => {
     } else {
       // Like
       await Like.create({ userId, artworkId });
-      
-      // SYNC: Increment likeCount (already implemented correctly)
       await Artwork.findByIdAndUpdate(artworkId, { $inc: { likeCount: 1 } });
       await User.findByIdAndUpdate(userId, { $addToSet: { likes: artworkId } });
 
@@ -56,7 +52,7 @@ exports.getLikedArtworks = async (req, res) => {
         path: "likes",
         populate: {
           path: "artistId",
-          select: "name avatarUrl"
+          select: "name avatarUrl" // to get artist details
         }
       })
       .select("likes");
