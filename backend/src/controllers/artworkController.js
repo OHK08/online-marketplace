@@ -4,41 +4,129 @@ const User = require("../models/User");
 const mongoose = require("mongoose");
 const { cloudinary } = require("../config/cloudinary");
 
-// ------------------ CREATE ARTWORK ------------------
 exports.createArtwork = async (req, res) => {
   try {
-    const { title, description, price, currency, quantity, status, tags } = req.body;
+    console.log("=== CREATE ARTWORK DEBUG ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("Request files:", req.files);
+    console.log("User ID:", req.user?.id);
 
+    const { title, description, price, currency, quantity, status } = req.body;
+
+    // Validation
     if (!title || !price) {
+      console.log("Validation failed: missing title or price");
       return res.status(400).json({
         success: false,
         message: "Title and price are required",
       });
     }
 
-    let media = (req.files || []).map((file) => ({
-      url: file.path,
-      type: file.mimetype.startsWith("video") ? "video" : "image",
-      sizeBytes: file.size,
-      storageKey: file.filename,
-    }));
+    // Handle tags - completely optional
+    let tags = [];
+    if (req.body.tags !== undefined && req.body.tags !== null && req.body.tags !== '') {
+      const tagsInput = req.body.tags;
+      console.log("Tags input:", tagsInput, "Type:", typeof tagsInput);
+      
+      if (Array.isArray(tagsInput)) {
+        tags = tagsInput.filter(tag => tag && tag.trim() !== '');
+      } else if (typeof tagsInput === 'string') {
+        const trimmed = tagsInput.trim();
+        if (trimmed !== '') {
+          if (trimmed.startsWith('[')) {
+            try {
+              tags = JSON.parse(trimmed);
+              if (!Array.isArray(tags)) {
+                tags = [trimmed];
+              }
+            } catch (e) {
+              console.log("Failed to parse tags as JSON, treating as single tag");
+              tags = [trimmed];
+            }
+          } else {
+            tags = [trimmed];
+          }
+        }
+      }
+    } else {
+      console.log("Tags not provided, using empty array");
+    }
+
+    console.log("Parsed tags:", tags);
+
+    // Process uploaded files with better error handling
+    let media = [];
+    if (req.files && req.files.length > 0) {
+      console.log("Processing files...");
+      
+      media = req.files.map((file) => {
+        console.log("File details:", {
+          path: file.path,
+          filename: file.filename,
+          mimetype: file.mimetype,
+          size: file.size
+        });
+        
+        // Cloudinary provides the full URL in file.path
+        if (!file.path) {
+          throw new Error(`File upload failed: missing path for ${file.originalname}`);
+        }
+        
+        return {
+          url: file.path, // Cloudinary URL
+          type: file.mimetype.startsWith("video") ? "video" : "image",
+          sizeBytes: file.size,
+          storageKey: file.filename, // Cloudinary public_id
+        };
+      });
+      
+      console.log("Successfully processed media:", media);
+    } else {
+      console.log("No files uploaded");
+    }
 
     // Get artist name for denormalization
-    const artist = await User.findById(req.user.id).select('name');
-    const artistName = artist?.name || '';
+    let artistName = '';
+    try {
+      const artist = await User.findById(req.user.id).select('name');
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: "Artist not found",
+        });
+      }
+      artistName = artist.name || '';
+      console.log("Artist name:", artistName);
+    } catch (error) {
+      console.error("Error fetching artist:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching artist details",
+        error: error.message,
+      });
+    }
 
-    const artwork = await Artwork.create({
+    // Prepare artwork data
+    const artworkData = {
       artistId: req.user.id,
-      title,
-      description,
-      price,
+      title: title.trim(),
+      description: description ? description.trim() : '',
+      price: Number(price),
       currency: currency || "INR",
-      quantity: quantity || 1,
+      quantity: quantity ? Number(quantity) : 1,
       status: status || "draft",
-      tags: tags || [],
-      artistName, // Set artistName on creation
-      media,
-    });
+      tags: tags,
+      artistName: artistName,
+      media: media,
+      updatedAt_timestamp: Date.now(),
+    };
+
+    console.log("Creating artwork with data:", JSON.stringify(artworkData, null, 2));
+
+    // Create artwork
+    const artwork = await Artwork.create(artworkData);
+
+    console.log("Artwork created successfully:", artwork._id);
 
     res.status(201).json({
       success: true,
@@ -46,11 +134,31 @@ exports.createArtwork = async (req, res) => {
       artwork,
     });
   } catch (err) {
-    console.error("Error creating artwork:", err);
+    console.error("=== ERROR CREATING ARTWORK ===");
+    console.error("Error name:", err.name);
+    console.error("Error message:", err.message);
+    console.error("Error stack:", err.stack);
+    
+    // Cleanup uploaded files if artwork creation fails
+    if (req.files && req.files.length > 0) {
+      console.log("Attempting to cleanup uploaded files...");
+      for (const file of req.files) {
+        if (file.filename) {
+          try {
+            await cloudinary.uploader.destroy(file.filename);
+            console.log(`Deleted file: ${file.filename}`);
+          } catch (cleanupErr) {
+            console.error("Error cleaning up file:", cleanupErr.message);
+          }
+        }
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: "Internal server error while creating artwork",
       error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     });
   }
 };
@@ -162,10 +270,12 @@ exports.myArtworks = async (req, res) => {
 exports.updateArtwork = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, price, currency, quantity, status, tags } = req.body;
+    const { title, description, price, currency, quantity, status } = req.body;
     
     const artwork = await Artwork.findById(id);
-    if (!artwork) return res.status(404).json({ success: false, message: "Artwork not found" });
+    if (!artwork) {
+      return res.status(404).json({ success: false, message: "Artwork not found" });
+    }
     
     if (artwork.artistId.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
@@ -178,13 +288,44 @@ exports.updateArtwork = async (req, res) => {
       });
     }
     
-    if (title) artwork.title = title;
-    if (description) artwork.description = description;
-    if (price) artwork.price = price;
+    if (title) artwork.title = title.trim();
+    if (description !== undefined) artwork.description = description.trim();
+    if (price) artwork.price = Number(price);
     if (currency) artwork.currency = currency;
-    if (quantity) artwork.quantity = quantity;
+    if (quantity) artwork.quantity = Number(quantity);
     if (status) artwork.status = status;
-    if (tags) artwork.tags = tags;
+    
+    // Handle tags
+    if (req.body.tags !== undefined) {
+      let tags = [];
+      const tagsInput = req.body.tags;
+      
+      if (tagsInput === null || tagsInput === '') {
+        tags = [];
+      } else if (Array.isArray(tagsInput)) {
+        tags = tagsInput.filter(tag => tag && tag.trim() !== '');
+      } else if (typeof tagsInput === 'string') {
+        const trimmed = tagsInput.trim();
+        if (trimmed === '') {
+          tags = [];
+        } else if (trimmed.startsWith('[')) {
+          try {
+            tags = JSON.parse(trimmed);
+            if (!Array.isArray(tags)) {
+              tags = [trimmed];
+            }
+          } catch (e) {
+            tags = [trimmed];
+          }
+        } else {
+          tags = [trimmed];
+        }
+      }
+      
+      artwork.tags = tags;
+    }
+    
+    artwork.updatedAt_timestamp = Date.now();
     
     await artwork.save();
     
@@ -231,6 +372,8 @@ exports.restockArtwork = async (req, res) => {
     if (artwork.status === "out_of_stock" || artwork.status === "removed") {
       artwork.status = "published";
     }
+
+    artwork.updatedAt_timestamp = Date.now();
 
     await artwork.save();
 
