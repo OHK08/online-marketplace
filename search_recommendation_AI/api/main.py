@@ -65,13 +65,22 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+# --- ✅ CORS CONFIGURATION ---
+# Define allowed frontend origins
+allowed_origins = [
+    "http://localhost:3000",  # local React dev
+    "https://your-frontend.vercel.app",  # replace with your actual Vercel domain
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- END CORS CONFIGURATION ---
+
 
 # --- THIS IS THE FIX ---
 # Include routers with the correct prefix
