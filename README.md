@@ -41,10 +41,29 @@ online-marketplace/
 │   ├── .gitignore             
 │   └── package.json
 │
-├── docs/                       # Documentation
-│
-├── .gitignore                  # Root ignore file
+├── gift_ai_service/
+│   │
+│   ├── main.py                      # FastAPI entrypoint (exposes endpoints)
+│   │
+│   ├── core/
+│   │   ├── orchestrator.py          # Manages full GenAI gift-bundle pipeline
+│   │   ├── vector_store.py          # MongoDB vector store for semantic search
+│   │   ├── llm_client.py            # Handles all LLM interactions (OpenAI, etc.)
+│   │   ├── config.py                # Environment + constants
+│   │   └── __init__.py
+│   │
+│   ├── services/
+│   │   ├── gift_intent_service.py       # Extracts gift intent (occasion, recipient, etc.)
+│   │   ├── gift_retrieval_service.py    # Retrieves similar products using embeddings
+│   │   ├── gift_bundle_service.py       # Creates final gift bundles
+│   │   ├── gift_validation_service.py   # Validates and ranks generated bundles
+│   │   ├── gift_prompt_templates.py     # Contains reusable prompt templates
+│   │   └── __init__.py
+│   │
+│   └── requirements.txt
+│   
+├── docs/          
+├── .gitignore                 # Root ignore
 └── README.md
 
 ```
-
