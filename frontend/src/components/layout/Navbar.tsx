@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart, Sparkles } from 'lucide-react';
+import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,12 +27,12 @@ export const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [cartItemCount, setCartItemCount] = useState(0);
 
-  // Fetch cart item count
+  // Fetch cart item count on mount and when user changes
   useEffect(() => {
     if (user) {
       fetchCartItemCount();
     } else {
-      setCartItemCount(0);
+      setCartItemCount(0); // Reset cart count for unauthenticated users
     }
   }, [user]);
 
@@ -52,7 +52,7 @@ export const Navbar = () => {
     }
   };
 
-  // CMD/CTRL + K for search
+  // Handle CMD/CTRL + K for search focus
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -61,6 +61,7 @@ export const Navbar = () => {
         searchInput?.focus();
       }
     };
+
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
@@ -164,7 +165,10 @@ export const Navbar = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center space-x-2">
+        <Link
+          to={user ? '/dashboard' : '/'}
+          className="flex items-center space-x-2"
+        >
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-glow rounded-lg flex items-center justify-center">
             <ShoppingBag className="w-5 h-5 text-primary-foreground" />
           </div>
@@ -178,7 +182,7 @@ export const Navbar = () => {
             <Input
               id="search-input"
               type="text"
-              placeholder="Search products... (Command K)"
+              placeholder="Search products... (⌘K)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4"
@@ -187,29 +191,17 @@ export const Navbar = () => {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-8">
-          <Link
-            to="/dashboard"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
+        <div className="hidden md:flex items-center space-x-8">
+          <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
             Explore
-          </Link>
-
-          {/* GIFT AI LINK */}
-          <Link
-            to="/gift-ai"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Gift AI
-          </Link>
-
+          </a>
           <a href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
             About
           </a>
           <a href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
             Contact
           </a>
-        </nav>
+        </div>
 
         {/* Desktop User Actions */}
         <div className="hidden md:flex">
@@ -225,8 +217,7 @@ export const Navbar = () => {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-              <div className="flex flex-col space-y-6 mt-8">
-
+              <div className="flex flex-col space-y-4 mt-8">
                 {/* Mobile Search */}
                 <form onSubmit={handleSearch} className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -238,25 +229,6 @@ export const Navbar = () => {
                     className="w-full pl-10 pr-4"
                   />
                 </form>
-
-                {/* Mobile Nav Links */}
-                <div className="flex flex-col space-y-3">
-                  <Link to="/dashboard" className="text-lg font-medium hover:text-purple-600">
-                    Explore
-                  </Link>
-
-                  {/* GIFT AI IN MOBILE */}
-                  <Link to="/gift-ai" className="text-lg font-medium hover:text-purple-600">
-                    Gift AI
-                  </Link>
-
-                  <a href="/about" className="text-lg font-medium text-muted-foreground hover:text-foreground">
-                    About
-                  </a>
-                  <a href="/contact" className="text-lg font-medium text-muted-foreground hover:text-foreground">
-                    Contact
-                  </a>
-                </div>
 
                 <NavContent />
               </div>

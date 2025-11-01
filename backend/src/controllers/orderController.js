@@ -2,13 +2,23 @@
 const { instance } = require("../config/razorpay");
 const Order = require("../models/Order");
 const Artwork = require("../models/Artwork");
-const User = require("../models/User");
 const crypto = require("crypto");
+
+// Helper function to validate address
+const validateAddress = (address) => {
+  const required = ['fullName', 'phone', 'addressLine1', 'city', 'state', 'pincode'];
+  for (const field of required) {
+    if (!address[field]) {
+      return { valid: false, message: `${field} is required in shipping address` };
+    }
+  }
+  return { valid: true };
+};
 
 // ------------------ CREATE ORDER (Multi-Seller) ------------------
 exports.createOrder = async (req, res) => {
   try {
-    const { items, shippingAddressId } = req.body;
+    const { items, shippingAddress } = req.body;
     const buyerId = req.user.id;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -16,19 +26,13 @@ exports.createOrder = async (req, res) => {
     }
 
     // Validate shipping address
-    if (!shippingAddressId) {
-      return res.status(400).json({ success: false, message: "Shipping address ID is required" });
+    if (!shippingAddress) {
+      return res.status(400).json({ success: false, message: "Shipping address is required" });
     }
 
-    // Verify address exists
-    const user = await User.findById(buyerId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const address = user.addresses.id(shippingAddressId);
-    if (!address) {
-      return res.status(404).json({ success: false, message: "Shipping address not found" });
+    const addressValidation = validateAddress(shippingAddress);
+    if (!addressValidation.valid) {
+      return res.status(400).json({ success: false, message: addressValidation.message });
     }
 
     // Group items by seller
@@ -89,7 +93,7 @@ exports.createOrder = async (req, res) => {
         items: orderItems,
         total,
         currency: "INR",
-        shippingAddressId,
+        shippingAddress,
         razorpayOrderId: razorpayOrder.id,
         status: "created",
       });
@@ -131,7 +135,7 @@ exports.verifyPayment = async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpaySignature) {
-      console.error("Payment signature mismatch");
+      console.error("Payment signature mismatch. Expected:", expectedSignature, "Received:", razorpaySignature);
       return res.status(400).json({ success: false, message: "Payment verification failed" });
     }
 
@@ -171,27 +175,12 @@ exports.verifyPayment = async (req, res) => {
 exports.getMyOrders = async (req, res) => {
   try {
     const buyerId = req.user.id;
-    
     const orders = await Order.find({ buyerId })
       .populate("items.artworkId")
       .populate("items.sellerId", "name email avatarUrl")
       .sort({ createdAt: -1 });
 
-    // Populate shipping address for each order
-    const user = await User.findById(buyerId).select("addresses");
-    
-    const ordersWithAddress = orders.map(order => {
-      const orderObj = order.toObject();
-      const address = user.addresses.id(order.shippingAddressId);
-      orderObj.shippingAddress = address || null;
-      return orderObj;
-    });
-
-    res.json({ 
-      success: true, 
-      count: ordersWithAddress.length, 
-      orders: ordersWithAddress 
-    });
+    res.json({ success: true, count: orders.length, orders });
   } catch (err) {
     console.error("Error in getMyOrders:", err);
     res.status(500).json({
@@ -205,32 +194,12 @@ exports.getMyOrders = async (req, res) => {
 exports.getSales = async (req, res) => {
   try {
     const sellerId = req.user.id;
-    
     const sales = await Order.find({ "items.sellerId": sellerId })
       .populate("items.artworkId")
       .populate("buyerId", "name email avatarUrl")
       .sort({ createdAt: -1 });
 
-    // Populate shipping addresses
-    const salesWithAddress = [];
-    
-    for (const order of sales) {
-      const orderObj = order.toObject();
-      const buyer = await User.findById(order.buyerId).select("addresses");
-      
-      if (buyer) {
-        const address = buyer.addresses.id(order.shippingAddressId);
-        orderObj.shippingAddress = address || null;
-      }
-      
-      salesWithAddress.push(orderObj);
-    }
-
-    res.json({ 
-      success: true, 
-      count: salesWithAddress.length, 
-      sales: salesWithAddress 
-    });
+    res.json({ success: true, count: sales.length, sales });
   } catch (err) {
     console.error("Error in getSales:", err);
     res.status(500).json({
@@ -264,10 +233,12 @@ exports.updateOrderStatus = async (req, res) => {
 
     order.status = status;
     
+    // Add tracking info if provided
     if (trackingNumber) {
       order.trackingNumber = trackingNumber;
     }
 
+    // Set shipped/delivered timestamps
     if (status === "shipped" && !order.shippedAt) {
       order.shippedAt = new Date();
     }
@@ -290,7 +261,7 @@ exports.updateOrderStatus = async (req, res) => {
 // ------------------ CREATE DIRECT ORDER ------------------
 exports.createDirectOrder = async (req, res) => {
   try {
-    const { artworkId, qty, shippingAddressId } = req.body;
+    const { artworkId, qty, shippingAddress } = req.body;
     const buyerId = req.user.id;
 
     if (!artworkId || !qty) {
@@ -298,19 +269,13 @@ exports.createDirectOrder = async (req, res) => {
     }
 
     // Validate shipping address
-    if (!shippingAddressId) {
-      return res.status(400).json({ success: false, message: "Shipping address ID is required" });
+    if (!shippingAddress) {
+      return res.status(400).json({ success: false, message: "Shipping address is required" });
     }
 
-    // Verify address exists
-    const user = await User.findById(buyerId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const address = user.addresses.id(shippingAddressId);
-    if (!address) {
-      return res.status(404).json({ success: false, message: "Shipping address not found" });
+    const addressValidation = validateAddress(shippingAddress);
+    if (!addressValidation.valid) {
+      return res.status(400).json({ success: false, message: addressValidation.message });
     }
     
     const artwork = await Artwork.findById(artworkId);
@@ -343,7 +308,7 @@ exports.createDirectOrder = async (req, res) => {
       }],
       total,
       currency: "INR",
-      shippingAddressId,
+      shippingAddress,
       razorpayOrderId: razorpayOrder.id,
       status: "created",
     });
