@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart } from 'lucide-react';
+import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -52,7 +52,6 @@ export const Navbar = () => {
     }
   };
 
-  // Handle CMD/CTRL + K for search focus
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -175,32 +174,33 @@ export const Navbar = () => {
           <span className="font-bold text-xl">ORCHID</span>
         </Link>
 
-        {/* Search - Desktop */}
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
-          <form onSubmit={handleSearch} className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              id="search-input"
-              type="text"
-              placeholder="Search products... (⌘K)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4"
-            />
-          </form>
-        </div>
-
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-8">
-          <a href="/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+          <Link 
+            to="/dashboard" 
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             Explore
-          </a>
-          <a href="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+          </Link>
+          <Link 
+            to="/search" 
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            <Sparkles className="w-4 h-4 group-hover:text-blue-600 transition-colors" />
+            <span>AI Search</span>
+          </Link>
+          <Link 
+            to="/about" 
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             About
-          </a>
-          <a href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
+          </Link>
+          <Link 
+            to="/contact" 
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             Contact
-          </a>
+          </Link>
         </div>
 
         {/* Desktop User Actions */}
@@ -218,6 +218,35 @@ export const Navbar = () => {
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
               <div className="flex flex-col space-y-4 mt-8">
+                {/* Mobile Navigation Links */}
+                <div className="flex flex-col space-y-3 pb-4 border-b">
+                  <Link 
+                    to="/dashboard" 
+                    className="text-foreground hover:text-primary transition-colors py-2"
+                  >
+                    Explore
+                  </Link>
+                  <Link 
+                    to="/search" 
+                    className="flex items-center gap-2 text-foreground hover:text-primary transition-colors py-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>AI Search</span>
+                  </Link>
+                  <Link 
+                    to="/about" 
+                    className="text-foreground hover:text-primary transition-colors py-2"
+                  >
+                    About
+                  </Link>
+                  <Link 
+                    to="/contact" 
+                    className="text-foreground hover:text-primary transition-colors py-2"
+                  >
+                    Contact
+                  </Link>
+                </div>
+
                 {/* Mobile Search */}
                 <form onSubmit={handleSearch} className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
