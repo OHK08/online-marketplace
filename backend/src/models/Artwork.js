@@ -47,6 +47,12 @@ const ArtworkSchema = new Schema({
     default: [],
     index: true,
   },
+
+  // Unix timestamp in milliseconds for update job
+  updatedAt_timestamp: {
+    type: Number,
+    index: true,
+  },
 }, { timestamps: true });
 
 ArtworkSchema.index({ title: 'text', description: 'text', tags: 'text' });
