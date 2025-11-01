@@ -38,7 +38,7 @@ app.use(cookieParser());
 // Allowed frontend origins
 const allowedOrigins = [
   process.env.FRONTEND_URL, // from env variable
-  "http://localhost:5173", // local dev
+  "http://localhost:3000", // local dev
 ].filter(Boolean); // Remove undefined values
 
 // CORS setup
@@ -58,11 +58,8 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// Apply CORS to all routes
+// Apply CORS to all routes (this handles OPTIONS requests too)
 app.use(cors(corsOptions));
-
-// Handle all OPTIONS (preflight) requests globally
-app.options("*", cors(corsOptions));
 
 // ------------------- Routes -------------------
 app.use("/api/v1/auth", authRoutes);
@@ -72,8 +69,8 @@ app.use("/api/v1/order", orderRoutes);
 app.use("/api/v1/like", likeRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/vision", visionRoutes);
-app.use("/api/v1/search-ai/search", searchRoutes);
-app.use("/api/v1/search-ai/recommendations", recommendationRoutes);
+app.use("/api/v1/search", searchRoutes);
+app.use("/api/v1/recommendations", recommendationRoutes);
 app.use("/api/v1/gift-ai", giftAIRoutes);
 
 // ------------------- Health Check -------------------
@@ -135,6 +132,6 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📦 Backend API: http://localhost:${PORT}`);
   console.log(`🎁 Gift AI Service: ${process.env.GIFT_AI_SERVICE_URL || "http://localhost:8001"}`);
-  console.log(`👁️  Vision AI Service: ${process.env.VISION_AI_SERVICE_URL || "http://localhost:8004"}`);
-  console.log(`🌐 Allowed Origins: ${allowedOrigins.join(", ")}`);
+  console.log(`👁️  Vision AI Service: ${process.env.VISION_AI_SERVICE_URL || "http://localhost:8001"}`);
+  console.log(`🌍 Allowed Origins: ${allowedOrigins.join(", ")}`);
 });
