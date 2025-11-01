@@ -1,7 +1,5 @@
 # --- Core API Framework ---
 fastapi==0.115.2
-# We list 'uvicorn' and its dependencies manually because
-# --no-deps in the Dockerfile will break 'uvicorn[standard]'
 uvicorn==0.32.0
 click
 httptools
@@ -11,28 +9,23 @@ watchfiles
 # --- FastAPI Dependencies ---
 starlette==0.37.2
 
-# --- Pydantic Dependencies (for --no-deps) ---
+# --- Pydantic Dependencies ---
 typing_extensions
-pydantic_core
+# Removed pydantic_core (auto-installed via Pydantic)
 
 # --- Databases & Caching ---
 redis==5.0.1
 pymongo==4.6.1
-dnspython # Required for mongodb+srv://
+dnspython
 
 # --- Google Cloud SDKs (Stable) ---
 google-cloud-aiplatform==1.48.0
 proto-plus==1.22.3
 protobuf==4.25.3
 googleapis-common-protos==1.63.2
-google-cloud-secret-manager==2.17.0  # <--- ADD THIS LINE
+google-cloud-secret-manager==2.17.0
 
 # --- Config & Env Management ---
 python-dotenv==1.0.1
 pydantic==2.5.0
 pydantic-settings==2.1.0
-
-# --- Dependencies handled in Dockerfile ---
-# googleapis-common-protos
-# protobuf
-# proto-plus

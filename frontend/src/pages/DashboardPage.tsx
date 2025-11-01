@@ -64,7 +64,7 @@ const DashboardPage = () => {
         <div className="text-center mb-6">
           <Link to="/festive-special">
             <h2 className="text-2xl font-bold text-black-500 animate-bounce">
-              🎉 Festive Offers! 🎉
+              🎉 Special Offers! 🎉
             </h2>
           </Link>
         </div>

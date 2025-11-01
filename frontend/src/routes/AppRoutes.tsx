@@ -19,6 +19,7 @@ import { AboutPage } from '@/pages/AboutPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { ArtistPage } from '@/pages/ArtistPage';
 import FestiveSpecialPage from '@/pages/FestiveSpecialPage';
+import SearchPage from '@/pages/SearchPage';
 
 export const AppRoutes = () => {
   const { mode } = useUI();
@@ -104,6 +105,15 @@ export const AppRoutes = () => {
         element={
           <RequireAuth>
             <MainLayout><FestiveSpecialPage /></MainLayout>
+          </RequireAuth>
+        } 
+      />
+
+      <Route 
+        path="/search" 
+        element={
+          <RequireAuth>
+            <MainLayout><SearchPage /></MainLayout>
           </RequireAuth>
         } 
       />

@@ -19,7 +19,7 @@ const FESTIVALS: { [key: number]: { tags: string[]; banner: string; color: strin
   8: { tags: ["friendship", "gift", "celebration"], banner: "🤝 Friendship Month Specials!", color: "bg-green-200" },
   9: { tags: ["diwali", "lights", "gift"], banner: "🪔 Happy Diwali Month!", color: "bg-yellow-100" },
   10: { tags: ["diwali", "lights", "gift"], banner: "🪔 Happy Diwali Month!", color: "bg-yellow-100" },
-  11: { tags: ["thanksgiving", "harvest", "gift"], banner: "🦃 Thanksgiving Specials!", color: "bg-orange-200" },
+  11: { tags: ["children", "fun", "toy", "gift"], banner: "🙍🙍‍♀️ Children's Day Specials!", color: "bg-blue-200" },
   12: { tags: ["christmas", "xmas", "tree", "gift"], banner: "🎄 Merry Christmas Month!", color: "bg-red-100" },
 };
 
@@ -90,7 +90,7 @@ const FestiveSpecialPage: React.FC = () => {
       {/* Festival Banner */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold animate-pulse">{festival.banner}</h1>
-        <p className="text-gray-700 mt-2">Check out our special items for this festival!</p>
+        <p className="text-gray-700 mt-2">Check out our special items for this ocassion!</p>
       </div>
 
       {/* Items Grid */}
