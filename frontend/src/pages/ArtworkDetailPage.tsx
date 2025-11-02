@@ -6,15 +6,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Heart, Share, ShoppingCart, ArrowLeft, CreditCard, Plus, Minus, Brush, Star, IndianRupee, ShieldAlert, Calendar, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Heart, Share, ShoppingCart, ArrowLeft, CreditCard, Plus, Minus, Brush, Star, IndianRupee, ShieldAlert, Calendar, AlertCircle, MapPin, Plus as PlusIcon } from 'lucide-react';
 import { artworkService } from '@/services/artwork';
 import { likeService } from '@/services/like';
 import { cartService } from '@/services/cart';
+import { userService, Address } from '@/services/user';
+import { orderService } from '@/services/order';
 import { visionAiService } from '@/services/visionAi';
 import { giftAiService } from '@/services/giftAi';
 import { Loader } from '@/components/ui/Loader';
 import { toast } from 'sonner';
 import { useCopyLink } from '@/hooks/useCopyLink';
+import { AddAddressForm } from '@/components/forms/AddAddressForm';
 
 declare global {
   interface Window {
@@ -34,8 +38,14 @@ export const ArtworkDetailPage = () => {
   const [buyingNow, setBuyingNow] = useState(false);
   const [aiQuality, setAiQuality] = useState<{ rating: string; confidence: number } | null>(null);
   const [loadingQuality, setLoadingQuality] = useState(false);
-  const [complementaryProducts, setComplementaryProducts] = useState<{ product: string; description: string }[]>([]);
+  const [complementaryProducts, setComplementaryProducts] = useState<string[]>([]);
   const [loadingComplementary, setLoadingComplementary] = useState(false);
+  
+  // Address management
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [showAddressDialog, setShowAddressDialog] = useState(false);
+  const [showAddAddressDialog, setShowAddAddressDialog] = useState(false);
   
   // Vision AI states
   const [visionAnalysis, setVisionAnalysis] = useState<{
@@ -64,6 +74,7 @@ export const ArtworkDetailPage = () => {
   // -------------------- EFFECTS --------------------
   useEffect(() => {
     if (id) fetchArtworkAndLikeStatus();
+    loadAddresses();
     loadRazorpayScript();
   }, [id]);
 
@@ -83,6 +94,21 @@ export const ArtworkDetailPage = () => {
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
+  };
+
+  const loadAddresses = async () => {
+    try {
+      const response = await userService.getAddresses();
+      if (response.success) {
+        setAddresses(response.addresses);
+        const defaultAddr = response.addresses.find(addr => addr.isDefault);
+        if (defaultAddr) {
+          setSelectedAddressId(defaultAddr._id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading addresses:', error);
+    }
   };
 
   const getCurrencySymbol = (currency: string) => {
@@ -131,20 +157,50 @@ export const ArtworkDetailPage = () => {
     }
   };
 
+  const handleAddAddress = async (addressData: any) => {
+    try {
+      const response = await userService.addAddress(addressData);
+      if (response.success) {
+        setAddresses([...addresses, response.address]);
+        setSelectedAddressId(response.address._id);
+        setShowAddAddressDialog(false);
+        toast.success('Address added successfully');
+      }
+    } catch (error) {
+      toast.error('Failed to add address');
+    }
+  };
+
   const handleBuyNow = async () => {
     if (!artwork) return;
     if (quantity > artwork.quantity) {
       toast.error('Not enough stock available');
       return;
     }
+
+    if (!selectedAddressId) {
+      toast.error('Please select a shipping address');
+      setShowAddressDialog(true);
+      return;
+    }
+
     try {
       setBuyingNow(true);
-      const orderResponse = await cartService.createDirectOrder([{ artworkId: artwork._id, qty: quantity }]);
+      
+      // Create direct order with shipping address
+      const orderResponse = await orderService.createDirectOrder({
+        artworkId: artwork._id,
+        qty: quantity,
+        shippingAddressId: selectedAddressId
+      });
+
       if (!orderResponse.success || !orderResponse.razorpayOrder) {
         toast.error('Failed to create order');
         return;
       }
+
       const { razorpayOrder } = orderResponse;
+      const selectedAddress = addresses.find(a => a._id === selectedAddressId);
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'your_razorpay_key_id',
@@ -155,7 +211,7 @@ export const ArtworkDetailPage = () => {
         order_id: razorpayOrder.id,
         handler: async function (response: any) {
           try {
-            const verifyResponse = await cartService.verifyDirectPayment({
+            const verifyResponse = await orderService.verifyPayment({
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
@@ -169,9 +225,8 @@ export const ArtworkDetailPage = () => {
           }
         },
         prefill: {
-          name: 'Customer Name',
-          email: 'customer@example.com',
-          contact: '9999999999',
+          name: selectedAddress?.fullName || 'Customer',
+          contact: selectedAddress?.phone || '9999999999',
         },
         theme: { color: '#3B82F6' },
       };
@@ -218,6 +273,8 @@ export const ArtworkDetailPage = () => {
       if (response.success && response.data) {
         const { quality_rating, confidence_score } = response.data;
         setAiQuality({ rating: quality_rating, confidence: confidence_score });
+      } else {
+        console.log('Quality rating unavailable:', response.error);
       }
     } catch (error) {
       console.error('AI Quality Prediction error:', error);
@@ -231,8 +288,29 @@ export const ArtworkDetailPage = () => {
     try {
       setLoadingComplementary(true);
       const response = await visionAiService.complementaryProducts(await (await fetch(artwork.media[0].url)).blob());
-      if (response.success && response.data?.complementary_products) {
-        setComplementaryProducts(response.data.complementary_products.slice(0, 3));
+      
+      if (response.success) {
+        // Try different possible data structures
+        let products = null;
+        
+        // Option 1: response.data.complementary_products
+        if (response.data?.complementary_products) {
+          products = response.data.complementary_products;
+        }
+        // Option 2: response.data is already the array
+        else if (Array.isArray(response.data)) {
+          products = response.data;
+        }
+        // Option 3: response itself has complementary_products
+        else if ((response as any).complementary_products) {
+          products = (response as any).complementary_products;
+        }
+        
+        if (products && Array.isArray(products) && products.length > 0) {
+          setComplementaryProducts(products.slice(0, 3));
+        }
+      } else {
+        console.log('Complementary products unavailable:', response.error);
       }
     } catch (error) {
       console.error('Complementary products error:', error);
@@ -248,15 +326,13 @@ export const ArtworkDetailPage = () => {
       return;
     }
 
-    // Check if already analyzed
     if (visionAnalysis[type]) {
-      return; // Already have data
+      return;
     }
 
     try {
       setLoadingVision(prev => ({ ...prev, [type]: true }));
       
-      // Fetch image as blob
       const imageBlob = await (await fetch(artwork.media[0].url)).blob();
       const imageFile = new File([imageBlob], 'artwork.jpg', { type: imageBlob.type });
 
@@ -324,6 +400,8 @@ export const ArtworkDetailPage = () => {
       </div>
     );
 
+  const selectedAddress = addresses.find(a => a._id === selectedAddressId);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -384,6 +462,54 @@ export const ArtworkDetailPage = () => {
                 <Share className="w-4 h-4 mr-2" /> Share
               </Button>
             </div>
+
+            {/* Shipping Address Section */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Delivery Address
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowAddressDialog(true)}
+                  >
+                    {selectedAddress ? 'Change' : 'Select'}
+                  </Button>
+                </div>
+                
+                {selectedAddress ? (
+                  <div className="text-sm space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{selectedAddress.label}</Badge>
+                      {selectedAddress.isDefault && (
+                        <Badge variant="outline" className="text-xs">Default</Badge>
+                      )}
+                    </div>
+                    <p className="font-medium">{selectedAddress.fullName}</p>
+                    <p className="text-muted-foreground">{selectedAddress.addressLine1}</p>
+                    {selectedAddress.addressLine2 && (
+                      <p className="text-muted-foreground">{selectedAddress.addressLine2}</p>
+                    )}
+                    <p className="text-muted-foreground">
+                      {selectedAddress.city}, {selectedAddress.state} - {selectedAddress.pincode}
+                    </p>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowAddAddressDialog(true)}
+                  >
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    Add Delivery Address
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Artwork Card */}
             <Card>
@@ -492,7 +618,12 @@ export const ArtworkDetailPage = () => {
                   </>
                 )}
               </Button>
-              <Button size="lg" className="flex-1 btn-gradient" onClick={handleBuyNow} disabled={buyingNow || artwork.quantity === 0}>
+              <Button 
+                size="lg" 
+                className="flex-1 btn-gradient" 
+                onClick={handleBuyNow} 
+                disabled={buyingNow || artwork.quantity === 0 || !selectedAddressId}
+              >
                 {buyingNow ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -522,7 +653,10 @@ export const ArtworkDetailPage = () => {
               <Loader text="Loading related products..." />
             </div>
           ) : complementaryProducts.length === 0 ? (
-            <p className="text-muted-foreground text-center py-6 text-base">No related products found.</p>
+            <div className="text-center py-6">
+              <p className="text-muted-foreground text-base">No related products found.</p>
+              <p className="text-xs text-muted-foreground mt-2">Debug: Check browser console for response data</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {complementaryProducts.map((item, idx) => (
@@ -531,8 +665,7 @@ export const ArtworkDetailPage = () => {
                   className="group relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-card border border-border rounded-lg"
                 >
                   <CardContent className="p-5">
-                    <h3 className="text-lg font-semibold mb-3 text-foreground">{item.product}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{item.description}</p>
+                    <p className="text-sm text-foreground leading-relaxed">{item}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -608,7 +741,6 @@ export const ArtworkDetailPage = () => {
                   </span>
                 </div>
 
-                {/* Craftsmanship Score */}
                 {visionAnalysis.quality.craftsmanship_score !== undefined && (
                   <div className="mb-5">
                     <div className="flex justify-between text-sm mb-1">
@@ -626,7 +758,6 @@ export const ArtworkDetailPage = () => {
                   </div>
                 )}
 
-                {/* Quality Label */}
                 <div className="mb-4">
                   <Badge
                     className={`text-lg px-4 py-1 ${
@@ -641,7 +772,6 @@ export const ArtworkDetailPage = () => {
                   </Badge>
                 </div>
 
-                {/* Details */}
                 {visionAnalysis.quality.details && (
                   <div className="bg-white/70 p-4 rounded-lg border border-amber-200">
                     <p className="text-sm text-amber-800 leading-relaxed italic">
@@ -753,6 +883,72 @@ export const ArtworkDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Address Selection Dialog */}
+      <Dialog open={showAddressDialog} onOpenChange={setShowAddressDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Delivery Address</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {addresses.map((address) => (
+              <Card
+                key={address._id}
+                className={`cursor-pointer transition-all ${
+                  selectedAddressId === address._id
+                    ? 'border-primary ring-2 ring-primary'
+                    : 'hover:border-primary/50'
+                }`}
+                onClick={() => {
+                  setSelectedAddressId(address._id);
+                  setShowAddressDialog(false);
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{address.label}</Badge>
+                      {address.isDefault && (
+                        <Badge variant="outline" className="text-xs">Default</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <p className="font-medium">{address.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{address.addressLine1}</p>
+                  {address.addressLine2 && (
+                    <p className="text-sm text-muted-foreground">{address.addressLine2}</p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {address.city}, {address.state} - {address.pincode}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Phone: {address.phone}</p>
+                </CardContent>
+              </Card>
+            ))}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowAddressDialog(false);
+                setShowAddAddressDialog(true);
+              }}
+            >
+              <PlusIcon className="w-4 h-4 mr-2" />
+              Add New Address
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Address Dialog */}
+      <Dialog open={showAddAddressDialog} onOpenChange={setShowAddAddressDialog}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Address</DialogTitle>
+          </DialogHeader>
+          <AddAddressForm onSuccess={handleAddAddress} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
