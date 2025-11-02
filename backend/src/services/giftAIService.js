@@ -20,7 +20,7 @@ class GiftAIService {
       baseURL: GIFT_AI_BASE_URL,
       timeout: AI_REQUEST_TIMEOUT,
       headers: { "Content-Type": "application/json" },
-    });GIFT_AI_BASE_URL
+    });
 
     this.visionClient = axios.create({
       baseURL: GIFT_AI_BASE_URL,

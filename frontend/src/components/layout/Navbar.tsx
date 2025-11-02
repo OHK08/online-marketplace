@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart, Sparkles } from 'lucide-react';
+import { Search, Menu, User, LogOut, Package, Heart, ShoppingBag, ShoppingCart, Sparkles, PlaySquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -183,6 +183,13 @@ export const Navbar = () => {
             Explore
           </Link>
           <Link 
+            to="/reels" 
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            <PlaySquare className="w-4 h-4 group-hover:text-purple-600 transition-colors" />
+            <span>Reels</span>
+          </Link>
+          <Link 
             to="/search" 
             className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors group"
           >
@@ -232,6 +239,13 @@ export const Navbar = () => {
                     className="text-foreground hover:text-primary transition-colors py-2"
                   >
                     Explore
+                  </Link>
+                  <Link 
+                    to="/reels" 
+                    className="flex items-center gap-2 text-foreground hover:text-primary transition-colors py-2"
+                  >
+                    <PlaySquare className="w-4 h-4" />
+                    <span>Showcase</span>
                   </Link>
                   <Link 
                     to="/search" 

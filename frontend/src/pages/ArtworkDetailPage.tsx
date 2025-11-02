@@ -15,6 +15,8 @@ import { userService, Address } from '@/services/user';
 import { orderService } from '@/services/order';
 import { visionAiService } from '@/services/visionAi';
 import { giftAiService } from '@/services/giftAi';
+import { getRecommendationsByUser, type Artwork } from '@/services/searchAi'; // Import recommendation function
+import { useAuth } from '@/context/AuthContext'; // Import auth context
 import { Loader } from '@/components/ui/Loader';
 import { toast } from 'sonner';
 import { useCopyLink } from '@/hooks/useCopyLink';
@@ -28,6 +30,7 @@ declare global {
 
 export const ArtworkDetailPage = () => {
   const { id } = useParams();
+  const { user } = useAuth(); // Get user from auth context
   const [artwork, setArtwork] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -38,8 +41,10 @@ export const ArtworkDetailPage = () => {
   const [buyingNow, setBuyingNow] = useState(false);
   const [aiQuality, setAiQuality] = useState<{ rating: string; confidence: number } | null>(null);
   const [loadingQuality, setLoadingQuality] = useState(false);
-  const [complementaryProducts, setComplementaryProducts] = useState<string[]>([]);
-  const [loadingComplementary, setLoadingComplementary] = useState(false);
+  
+  // Updated: Store full artwork objects for recommendations
+  const [recommendedArtworks, setRecommendedArtworks] = useState<Artwork[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   
   // Address management
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -81,9 +86,9 @@ export const ArtworkDetailPage = () => {
   useEffect(() => {
     if (artwork) {
       fetchAiQualityRating(artwork);
-      fetchComplementaryProducts(artwork);
+      fetchRecommendations(); // Fetch user-based recommendations
     }
-  }, [artwork]);
+  }, [artwork, user]);
 
   // -------------------- HELPERS --------------------
   const loadRazorpayScript = () => {
@@ -187,7 +192,6 @@ export const ArtworkDetailPage = () => {
     try {
       setBuyingNow(true);
       
-      // Create direct order with shipping address
       const orderResponse = await orderService.createDirectOrder({
         artworkId: artwork._id,
         qty: quantity,
@@ -283,39 +287,32 @@ export const ArtworkDetailPage = () => {
     }
   };
 
-  const fetchComplementaryProducts = async (artwork: any) => {
-    if (!artwork.media?.[0]?.url) return;
+  // NEW: Fetch personalized recommendations based on user preferences
+  const fetchRecommendations = async () => {
+    if (!user?._id) {
+      console.log('No user logged in, skipping recommendations');
+      return;
+    }
+
     try {
-      setLoadingComplementary(true);
-      const response = await visionAiService.complementaryProducts(await (await fetch(artwork.media[0].url)).blob());
+      setLoadingRecommendations(true);
+      const recommendations = await getRecommendationsByUser(user._id, 6);
       
-      if (response.success) {
-        // Try different possible data structures
-        let products = null;
-        
-        // Option 1: response.data.complementary_products
-        if (response.data?.complementary_products) {
-          products = response.data.complementary_products;
-        }
-        // Option 2: response.data is already the array
-        else if (Array.isArray(response.data)) {
-          products = response.data;
-        }
-        // Option 3: response itself has complementary_products
-        else if ((response as any).complementary_products) {
-          products = (response as any).complementary_products;
-        }
-        
-        if (products && Array.isArray(products) && products.length > 0) {
-          setComplementaryProducts(products.slice(0, 3));
-        }
-      } else {
-        console.log('Complementary products unavailable:', response.error);
+      // Filter out the current artwork from recommendations
+      const filteredRecommendations = recommendations.filter(
+        (rec) => rec._id !== id
+      );
+      
+      setRecommendedArtworks(filteredRecommendations.slice(0, 3));
+      
+      if (filteredRecommendations.length === 0) {
+        console.log('No recommendations available for this user');
       }
     } catch (error) {
-      console.error('Complementary products error:', error);
+      console.error('Error fetching recommendations:', error);
+      setRecommendedArtworks([]);
     } finally {
-      setLoadingComplementary(false);
+      setLoadingRecommendations(false);
     }
   };
 
@@ -645,27 +642,52 @@ export const ArtworkDetailPage = () => {
           </div>
         </div>
 
-        {/* People Also Bought */}
+        {/* Personalized Recommendations Section - UPDATED */}
         <div className="mt-12">
-          <h2 className="text-2xl font-bold mb-6 text-foreground">People Also Bought</h2>
-          {loadingComplementary ? (
+          <h2 className="text-2xl font-bold mb-6 text-foreground">
+            Recommended For You
+          </h2>
+          {loadingRecommendations ? (
             <div className="flex justify-center items-center py-6">
-              <Loader text="Loading related products..." />
+              <Loader text="Loading personalized recommendations..." />
             </div>
-          ) : complementaryProducts.length === 0 ? (
+          ) : recommendedArtworks.length === 0 ? (
             <div className="text-center py-6">
-              <p className="text-muted-foreground text-base">No related products found.</p>
-              <p className="text-xs text-muted-foreground mt-2">Debug: Check browser console for response data</p>
+              <p className="text-muted-foreground text-base">
+                {user ? "No personalized recommendations yet. Like some artworks to get started!" : "Log in to see personalized recommendations"}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {complementaryProducts.map((item, idx) => (
+              {recommendedArtworks.map((item) => (
                 <Card
-                  key={idx}
-                  className="group relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-card border border-border rounded-lg"
+                  key={item._id}
+                  className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 bg-card border border-border rounded-lg cursor-pointer"
+                  onClick={() => window.location.href = `/artwork/${item._id}`}
                 >
-                  <CardContent className="p-5">
-                    <p className="text-sm text-foreground leading-relaxed">{item}</p>
+                  <div className="aspect-square overflow-hidden bg-muted">
+                    <img
+                      src={item.media?.[0]?.url || '/placeholder.svg'}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-lg mb-1 line-clamp-1">{item.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-2">by {item.artistName}</p>
+                    <p className="text-lg font-bold text-primary">
+                      {getCurrencySymbol(item.currency || 'INR')}
+                      {item.price.toFixed(2)}
+                    </p>
+                    {item.tags && item.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {item.tags.slice(0, 2).map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

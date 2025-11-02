@@ -1,0 +1,395 @@
+.
+|____.gitignore
+|____backend
+| |____.dockerignore
+| |____.gitignore
+| |____checkRoute.js
+| |____Dockerfile
+| |____package-lock.json
+| |____package.json
+| |____src
+| | |____config
+| | | |____.gitkeep
+| | | |____aiServices.js
+| | | |____cloudinary.js
+| | | |____database.js
+| | | |____razorpay.js
+| | |____controllers
+| | | |____artworkController.js
+| | | |____authController.js
+| | | |____cartController.js
+| | | |____giftAIController.js
+| | | |____likeController.js
+| | | |____orderController.js
+| | | |____searchController.js
+| | | |____userController.js
+| | | |____visionController.js
+| | |____mail
+| | | |____templates
+| | | | |____emailVerificationTemplate.js
+| | |____middlewares
+| | | |____.gitkeep
+| | | |____authMiddleware.js
+| | | |____upload.js
+| | |____models
+| | | |____.gitkeep
+| | | |____Artwork.js
+| | | |____Cart.js
+| | | |____File.js
+| | | |____Like.js
+| | | |____Order.js
+| | | |____OTP.js
+| | | |____Story.js
+| | | |____User.js
+| | |____routes
+| | | |____artworkRoutes.js
+| | | |____authRoutes.js
+| | | |____cartRoutes.js
+| | | |____giftAIRoutes.js
+| | | |____likeRoutes.js
+| | | |____orderRoutes.js
+| | | |____userRoutes.js
+| | | |____visionRoutes.js
+| | |____server.js
+| | |____services
+| | | |____giftAIService.js
+| | | |____searchAI.js
+| | | |____visionAI.js
+| | |____utils
+| | | |____.gitkeep
+| | | |____mailSender.js
+|____docker-compose.yml
+|____frontend
+| |____.dockerignore
+| |____.env
+| |____.env.production
+| |____.gitignore
+| |____components.json
+| |____Dockerfile
+| |____eslint.config.js
+| |____index.html
+| |____nginx.conf
+| |____package-lock.json
+| |____package.json
+| |____postcss.config.js
+| |____public
+| | |____favicon.ico
+| | |____placeholder.svg
+| | |____robots.txt
+| |____README.md
+| |____src
+| | |____App.css
+| | |____App.tsx
+| | |____assets
+| | | |____hero-marketplace.jpg
+| | | |____pattern-bg.jpg
+| | | |____shopping-community.jpg
+| | |____components
+| | | |____forms
+| | | | |____AddAddressForm.tsx
+| | | | |____EditProfileForm.tsx
+| | | | |____LoginForm.tsx
+| | | | |____NewPostForm.tsx
+| | | | |____SignupForm.tsx
+| | | |____layout
+| | | | |____Footer.tsx
+| | | | |____MainLayout.tsx
+| | | | |____Navbar.tsx
+| | | |____seller
+| | | | |____InventoryTable.tsx
+| | | | |____OrdersTable.tsx
+| | | |____ui
+| | | | |____accordion.tsx
+| | | | |____alert-dialog.tsx
+| | | | |____alert.tsx
+| | | | |____aspect-ratio.tsx
+| | | | |____avatar.tsx
+| | | | |____badge.tsx
+| | | | |____breadcrumb.tsx
+| | | | |____button.tsx
+| | | | |____calendar.tsx
+| | | | |____card.tsx
+| | | | |____carousel.tsx
+| | | | |____chart.tsx
+| | | | |____checkbox.tsx
+| | | | |____collapsible.tsx
+| | | | |____command.tsx
+| | | | |____context-menu.tsx
+| | | | |____dialog.tsx
+| | | | |____drawer.tsx
+| | | | |____dropdown-menu.tsx
+| | | | |____EmptyState.tsx
+| | | | |____form.tsx
+| | | | |____hover-card.tsx
+| | | | |____input-otp.tsx
+| | | | |____input.tsx
+| | | | |____ItemCard.tsx
+| | | | |____label.tsx
+| | | | |____Loader.tsx
+| | | | |____menubar.tsx
+| | | | |____navigation-menu.tsx
+| | | | |____pagination.tsx
+| | | | |____popover.tsx
+| | | | |____progress.tsx
+| | | | |____radio-group.tsx
+| | | | |____resizable.tsx
+| | | | |____scroll-area.tsx
+| | | | |____select.tsx
+| | | | |____separator.tsx
+| | | | |____sheet.tsx
+| | | | |____sidebar.tsx
+| | | | |____skeleton.tsx
+| | | | |____slider.tsx
+| | | | |____sonner.tsx
+| | | | |____StoryBar.tsx
+| | | | |____switch.tsx
+| | | | |____table.tsx
+| | | | |____tabs.tsx
+| | | | |____textarea.tsx
+| | | | |____toast.tsx
+| | | | |____toaster.tsx
+| | | | |____toggle-group.tsx
+| | | | |____toggle.tsx
+| | | | |____tooltip.tsx
+| | | | |____use-toast.ts
+| | |____context
+| | | |____AuthContext.tsx
+| | | |____UIContext.tsx
+| | |____hooks
+| | | |____use-mobile.tsx
+| | | |____use-toast.ts
+| | | |____useCopyLink.ts
+| | |____index.css
+| | |____lib
+| | | |____axios.ts
+| | | |____clipboard.ts
+| | | |____utils.ts
+| | |____main.tsx
+| | |____pages
+| | | |____AboutPage.tsx
+| | | |____ArtistPage.tsx
+| | | |____ArtworkDetailPage.tsx
+| | | |____CartPage.tsx
+| | | |____ContactPage.tsx
+| | | |____DashboardPage.tsx
+| | | |____FestiveSpecialPage.tsx
+| | | |____GiftServicePage.tsx
+| | | |____LandingPage.tsx
+| | | |____LoginPage.tsx
+| | | |____NotFound.tsx
+| | | |____NotFoundPage.tsx
+| | | |____OrderHistoryPage.tsx
+| | | |____ProfilePage.tsx
+| | | |____SearchPage.tsx
+| | | |____SellerPage.tsx
+| | | |____SignupPage.tsx
+| | | |____WishlistPage.tsx
+| | |____routes
+| | | |____AppRoutes.tsx
+| | | |____RequireAuth.tsx
+| | |____services
+| | | |____aiClient.ts
+| | | |____artwork.ts
+| | | |____auth.ts
+| | | |____cart.ts
+| | | |____giftAi.ts
+| | | |____like.ts
+| | | |____order.ts
+| | | |____searchAi.ts
+| | | |____user.ts
+| | | |____visionAi.ts
+| | |____vite-env.d.ts
+| |____tailwind.config.ts
+| |____tsconfig.app.json
+| |____tsconfig.json
+| |____tsconfig.node.json
+| |____vercel.json
+| |____vite.config.ts
+|____genai-services
+| |____.dockerignore
+| |____.gitignore
+| |____api-controllers
+| | |____controllers
+| | | |____.gitkeep
+| | |____routes
+| | | |____.gitkeep
+| |____docker-compose.yml
+| |____Dockerfile
+| |____requirements.txt
+| |____src
+| | |____main.py
+| | |____vision_ai
+| | | |____processors
+| | | | |____image_processor.py
+| | | | |______init__.py
+| | | |____prompts
+| | | | |____prompt_engineering.py
+| | | |____requirements.txt
+| | | |____routes
+| | | | |____vision_routes.py
+| | | |____services
+| | | | |____vision_service.py
+| | | |____tests
+| | | | |____test_vision_service.py
+| | | | |______init__.py
+| | | |____test_basket.jpg
+| | | |____test_pottery.jpeg
+| | | |______init__.py
+| | |______init__.py
+|____gift_ai_service
+| |____.gitignore
+| |____core
+| | |____config.py
+| | |____llm_client.py
+| | |____orchestrator.py
+| | |____vector_store.py
+| | |______init__.py
+| | |______pycache__
+| | | |____config.cpython-310.pyc
+| | | |____config.cpython-311.pyc
+| | | |____config.cpython-313.pyc
+| | | |____llm_client.cpython-310.pyc
+| | | |____llm_client.cpython-311.pyc
+| | | |____llm_client.cpython-313.pyc
+| | | |____orchestrator.cpython-310.pyc
+| | | |____orchestrator.cpython-311.pyc
+| | | |____orchestrator.cpython-313.pyc
+| | | |____vector_store.cpython-310.pyc
+| | | |____vector_store.cpython-311.pyc
+| | | |____vector_store.cpython-313.pyc
+| | | |______init__.cpython-310.pyc
+| | | |______init__.cpython-311.pyc
+| | | |______init__.cpython-313.pyc
+| |____debug_env.py
+| |____Dockerfile
+| |____main.py
+| |____requirements.txt
+| |____services
+| | |____environment_service.py
+| | |____gift_bundle_service.py
+| | |____gift_intent_service.py
+| | |____gift_prompt_templates.py
+| | |____gift_retrieval_service.py
+| | |____gift_validation_service.py
+| | |______init__.py
+| | |______pycache__
+| | | |____environment_service.cpython-310.pyc
+| | | |____gift_bundle_service.cpython-310.pyc
+| | | |____gift_bundle_service.cpython-311.pyc
+| | | |____gift_bundle_service.cpython-313.pyc
+| | | |____gift_intent_service.cpython-310.pyc
+| | | |____gift_intent_service.cpython-311.pyc
+| | | |____gift_intent_service.cpython-313.pyc
+| | | |____gift_prompt_templates.cpython-310.pyc
+| | | |____gift_prompt_templates.cpython-311.pyc
+| | | |____gift_prompt_templates.cpython-313.pyc
+| | | |____gift_retrieval_service.cpython-310.pyc
+| | | |____gift_retrieval_service.cpython-311.pyc
+| | | |____gift_retrieval_service.cpython-313.pyc
+| | | |____gift_validation_service.cpython-310.pyc
+| | | |____gift_validation_service.cpython-311.pyc
+| | | |____gift_validation_service.cpython-313.pyc
+| | | |______init__.cpython-310.pyc
+| | | |______init__.cpython-311.pyc
+| | | |______init__.cpython-313.pyc
+| |____setup_gift_service.py
+| |____tests
+| | |____test_gift_services.py
+| | |____test_orchestrator.py
+| | |____test_vector_store.py
+| | |______init__.py
+| |____vision_ai_service.py
+| |______pycache__
+| | |____main.cpython-310.pyc
+| | |____main.cpython-311.pyc
+| | |____main.cpython-313.pyc
+| | |____vision_ai_service.cpython-310.pyc
+| | |____vision_ai_service.cpython-311.pyc
+| | |____vision_ai_service.cpython-313.pyc
+|____package-lock.json
+|____project_structure.txt
+|____README.md
+|____requirements.txt
+|____search-ai
+| |____src
+| | |____algorithms
+| | | |______pycache__
+| | | | |____collaborative_filtering.cpython-313.pyc
+| | | | |____content_based.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |____api
+| | | |______pycache__
+| | | | |____enhanced_search_routes.cpython-313.pyc
+| | | | |____recommendation_routes.cpython-313.pyc
+| | | | |____search_routes.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |____config
+| | | |______pycache__
+| | | | |____settings.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |____database
+| | | |______pycache__
+| | | | |____qdrant_client.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |____models
+| | | |______pycache__
+| | | | |____cultural_models.cpython-313.pyc
+| | | | |____recommendation_models.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |____services
+| | | |______pycache__
+| | | | |____cultural_service.cpython-313.pyc
+| | | | |____embedding_service.cpython-313.pyc
+| | | | |____enhanced_search_service.cpython-313.pyc
+| | | | |____query_enhancer.cpython-313.pyc
+| | | | |____recommendation_service.cpython-313.pyc
+| | | | |____reranker_service.cpython-313.pyc
+| | | | |____search_service.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |____utils
+| | | |______pycache__
+| | | | |____cultural_analyzer.cpython-313.pyc
+| | | | |____logger.cpython-313.pyc
+| | | | |______init__.cpython-313.pyc
+| | |______pycache__
+| | | |____main.cpython-313.pyc
+|____search_recommendation_AI
+| |____.gitignore
+| |____api
+| | |____cache.py
+| | |____config.py
+| | |____deploy_spec.json
+| | |____Dockerfile
+| | |____main.py
+| | |____mongo_client.py
+| | |____policy.json
+| | |____requirements.txt
+| | |____routes
+| | | |____recommendations.py
+| | | |____search.py
+| | | |______init__.py
+| | |____utils
+| | | |____serialization.py
+| | |____vertex_ai_client.py
+| |____indexing
+| | |____bulk
+| | | |____config.py
+| | | |____Dockerfile
+| | | |____index-config.json
+| | | |____main.py
+| | | |____requirements.txt
+| | | |____utils.py
+| | |____trigger-service
+| | | |____Dockerfile
+| | | |____main.py
+| | | |____requirements.txt
+| | |____update
+| | | |____config.py
+| | | |____Dockerfile
+| | | |____main.py
+| | | |____requirements.txt
+| | | |____set_test_env.sh
+| | | |____utils.py
+| |____README.md
+| |____scripts
+| | |____test_api.py

@@ -21,6 +21,7 @@ import { ArtistPage } from '@/pages/ArtistPage';
 import FestiveSpecialPage from '@/pages/FestiveSpecialPage';
 import SearchPage from '@/pages/SearchPage';
 import GiftServicePage from '@/pages/GiftServicePage';
+import ReelsPage from '@/pages/ReelsPage';
 
 export const AppRoutes = () => {
   const { mode } = useUI();
@@ -126,6 +127,16 @@ export const AppRoutes = () => {
           <MainLayout>
             <GiftServicePage />
           </MainLayout>
+          </RequireAuth>
+        } 
+      />
+
+      {/* Reels route */}
+      <Route 
+        path="/reels" 
+        element={
+          <RequireAuth>
+            <MainLayout><ReelsPage /></MainLayout>
           </RequireAuth>
         } 
       />
