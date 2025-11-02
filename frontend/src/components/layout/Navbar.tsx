@@ -189,6 +189,13 @@ export const Navbar = () => {
             <Sparkles className="w-4 h-4 group-hover:text-blue-600 transition-colors" />
             <span>AI Search</span>
           </Link>
+          {/* GIFT AI LINK */}
+          <Link
+            to="/gift-ai"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Gift AI
+          </Link>
           <Link 
             to="/about" 
             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -232,6 +239,9 @@ export const Navbar = () => {
                   >
                     <Sparkles className="w-4 h-4" />
                     <span>AI Search</span>
+                  </Link>
+                  <Link to="/gift-ai" className="text-lg font-medium hover:text-purple-600">
+                    Gift AI
                   </Link>
                   <Link 
                     to="/about" 

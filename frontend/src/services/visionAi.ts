@@ -17,14 +17,35 @@ async function postImage<T = any>(endpoint: string, imageFile: File | Blob): Pro
   try {
     const response = await apiClient.post(endpoint, formData, {
       headers: { "Content-Type": "multipart/form-data" },
-      timeout: 30000,
+      timeout: 120000, // Increased to 120 seconds (2 minutes)
     });
     return { success: true, data: response.data };
   } catch (err: any) {
+    console.error(`Vision AI ${endpoint} error:`, err);
+    
+    let errorMessage = "Vision AI request failed";
+    let errorDetails = err?.message || "Unknown error";
+    
+    // Handle different error types
+    if (err?.code === 'ECONNABORTED') {
+      errorMessage = "Request timeout";
+      errorDetails = "The AI service is taking too long to respond. Please try again.";
+    } else if (err?.response?.status === 502) {
+      errorMessage = "Service unavailable";
+      errorDetails = "The AI service is currently unavailable. Please try again later.";
+    } else if (err?.response?.status === 503) {
+      errorMessage = "Service temporarily unavailable";
+      errorDetails = "The AI service is temporarily down. Please try again in a few moments.";
+    } else if (err?.response?.data) {
+      errorDetails = typeof err.response.data === 'string' 
+        ? err.response.data 
+        : JSON.stringify(err.response.data);
+    }
+    
     return {
       success: false,
-      error: "Vision AI request failed",
-      details: err?.response?.data || err?.message || "Unknown error",
+      error: errorMessage,
+      details: errorDetails,
     };
   }
 }
