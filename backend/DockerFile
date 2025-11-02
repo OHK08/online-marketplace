@@ -1,22 +1,23 @@
-# Use an official Node.js runtime as the base image. 'alpine' is a lightweight version.
+# Use an official Node.js runtime as the base image
 FROM node:20-alpine
 
-# Set the working directory within the container.
+# Set the working directory within the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json first to leverage Docker's layer caching.
+# Copy package.json and package-lock.json first to leverage Docker's layer caching
 COPY package*.json ./
 
-# Install only production dependencies to keep the image size small.
+# Install only production dependencies to keep the image size small
 RUN npm install --only=production
 
-# Copy the rest of your application's source code into the container.
+# Copy the rest of your application's source code into the container
 COPY . .
 
-# Expose the port that your backend application listens on.
-# We'll use 8000 as defined in our main docker-compose.yml.
-EXPOSE 8000
+# Expose the port that Cloud Run will use (Cloud Run sets PORT env variable)
+# Default to 8080 if not set
+ENV PORT=8080
+EXPOSE 8080
 
-# Define the command to run your application.
-# You might need to change 'src/index.js' to your actual server entry point file (e.g., src/app.js, src/server.js).
-CMD [ "node", "src/index.js" ]
+# Define the command to run your application
+# FIXED: Changed from src/index.js to src/server.js (your actual entry point)
+CMD [ "node", "src/server.js" ]

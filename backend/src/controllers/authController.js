@@ -72,65 +72,49 @@ exports.sendOtp = async (req, res) => {
 // ------------------ SIGNUP ------------------
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password, confirmPassword, phone, otp } = req.body;
+    const { name, email, password, phone } = req.body;
 
-    if (!name || !email || !password || !confirmPassword || !otp) {
+    // === Step 1: Validate required fields ===
+    if (!name || !email || !password || !phone) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message: "All fields (name, email, password, phone) are required",
       });
     }
 
-    if (password !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Passwords do not match",
-      });
-    }
-
+    // === Step 2: Check if email already exists ===
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "User already exists. Please login instead.",
+        message: "User already exists with this email",
       });
     }
 
-    // Find the most recent OTP for this email
-    const recentOtp = await OTP.findOne({ email }).sort({ createdAt: -1 });
-    if (!recentOtp) {
+    // === Step 3: Check if phone number already exists ===
+    const existingPhone = await User.findOne({ phone });
+    if (existingPhone) {
       return res.status(400).json({
         success: false,
-        message: "Please request OTP first",
+        message: "Phone number already registered. Please login instead.",
       });
     }
 
-    if (recentOtp.code !== otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid OTP",
-      });
-    }
-
-    if (recentOtp.expiresAt < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: "OTP expired",
-      });
-    }
-
-    // Hash password
+    // === Step 4: Hash password securely ===
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // === Step 5: Create new user ===
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
       phone,
-      avatarUrl: `https://api.dicebear.com/5.x/initials/svg?seed=${name}`,
+      avatarUrl: `https://api.dicebear.com/5.x/initials/svg?seed=${encodeURIComponent(
+        name
+      )}`,
     });
 
+    // === Step 6: Send success response ===
     res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -141,11 +125,12 @@ exports.signup = async (req, res) => {
         phone: user.phone,
       },
     });
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("❌ Signup Error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error during signup",
+      message: "Server error during signup",
+      error: error.message,
     });
   }
 };

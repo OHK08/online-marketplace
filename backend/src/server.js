@@ -9,44 +9,34 @@ const multer = require("multer");
 const database = require("./config/database");
 const { cloudinaryConnect } = require("./config/cloudinary");
 
-// ------------------- Routes -------------------
-const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");
-const artworkRoutes = require("./routes/artworkRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const likeRoutes = require("./routes/likeRoutes");
-const cartRoutes = require("./routes/cartRoutes");
-const visionRoutes = require("./routes/visionRoutes");
-const searchRoutes = require("./routes/searchRoutes");
-const recommendationRoutes = require("./routes/recommendationRoutes");
-const giftAIRoutes = require("./routes/giftAIRoutes");
-
 // ------------------- Initialize -------------------
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8080; // Required for Cloud Run
 
 // ------------------- Database & Cloudinary -------------------
 database.connect();
 cloudinaryConnect();
 
 // ------------------- Middlewares -------------------
-// Parse JSON and cookies
 app.use(express.json());
 app.use(cookieParser());
 
 // Allowed frontend origins
-const allowedOrigins = [
-  process.env.FRONTEND_URL, // from env variable
-  "http://localhost:3000", // local dev
-].filter(Boolean); // Remove undefined values
+// Support multiple frontend origins, from env or defaults
+const allowedOrigins = (
+  process.env.FRONTEND_URL ||
+  process.env.FRONTEND_ORIGIN ||
+  "http://localhost:5173,http://localhost:3000"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // CORS setup
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
+    if (!origin) return callback(null, true); // Allow non-browser clients
     if (!allowedOrigins.includes(origin)) {
       console.warn(`🚫 CORS blocked request from origin: ${origin}`);
       return callback(new Error("CORS not allowed for this origin"), false);
@@ -58,28 +48,39 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// Apply CORS to all routes (this handles OPTIONS requests too)
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+// ------------------- Safe Route Loader -------------------
+function safeRouteLoad(path, routeName) {
+  try {
+    console.log(`🔗 Loading ${routeName}...`);
+    const route = require(path);
+    app.use(`/api/v1/${routeName}`, route);
+    console.log(`✅ Loaded ${routeName}`);
+  } catch (err) {
+    console.error(`❌ Failed to load ${routeName}:`, err.message);
+  }
+}
 
 // ------------------- Routes -------------------
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/user", userRoutes);
-app.use("/api/v1/artworks", artworkRoutes);
-app.use("/api/v1/order", orderRoutes);
-app.use("/api/v1/like", likeRoutes);
-app.use("/api/v1/cart", cartRoutes);
-app.use("/api/v1/vision", visionRoutes);
-app.use("/api/v1/search", searchRoutes);
-app.use("/api/v1/recommendations", recommendationRoutes);
-app.use("/api/v1/gift-ai", giftAIRoutes);
+safeRouteLoad("./routes/authRoutes", "auth");
+safeRouteLoad("./routes/userRoutes", "user");
+safeRouteLoad("./routes/artworkRoutes", "artworks");
+safeRouteLoad("./routes/orderRoutes", "order");
+safeRouteLoad("./routes/likeRoutes", "like");
+safeRouteLoad("./routes/cartRoutes", "cart");
+safeRouteLoad("./routes/visionRoutes", "vision");
+safeRouteLoad("./routes/giftAIRoutes", "gift-ai");
 
 // ------------------- Health Check -------------------
 app.get("/", (req, res) => {
-  return res.json({
+  res.json({
     success: true,
     message: "✅ Orchid backend is running successfully!",
     service: "Backend API",
-    frontend: process.env.FRONTEND_URL,
+    environment: process.env.NODE_ENV || "development",
+    allowedOrigins,
   });
 });
 
@@ -87,13 +88,12 @@ app.get("/", (req, res) => {
 app.use((err, req, res, next) => {
   console.error("=== GLOBAL ERROR HANDLER ===");
   console.error("🔥 Server Error:", err);
-  
-  // Handle multer errors
+
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
+    if (err.code === "LIMIT_FILE_SIZE") {
       return res.status(400).json({
         success: false,
-        message: 'File size too large. Maximum size is 10MB',
+        message: "File size too large. Maximum size is 10MB",
       });
     }
     return res.status(400).json({
@@ -101,37 +101,36 @@ app.use((err, req, res, next) => {
       message: `File upload error: ${err.message}`,
     });
   }
-  
-  // Handle invalid file type errors
-  if (err.message && err.message.includes('Invalid file type')) {
-    return res.status(400).json({
-      success: false,
-      message: err.message,
-    });
+
+  if (err.message && err.message.includes("Invalid file type")) {
+    return res.status(400).json({ success: false, message: err.message });
   }
-  
-  // Handle CORS errors
-  if (err.message && err.message.includes('CORS')) {
+
+  if (err.message && err.message.includes("CORS")) {
     return res.status(403).json({
       success: false,
-      message: 'CORS error: Origin not allowed',
+      message: "CORS error: Origin not allowed",
     });
   }
-  
-  // Generic error handler
+
   res.status(500).json({
     success: false,
-    message: 'Internal Server Error',
+    message: "Internal Server Error",
     error: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
 
 // ------------------- Start Server -------------------
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📦 Backend API: http://localhost:${PORT}`);
-  console.log(`🎁 Gift AI Service: ${process.env.GIFT_AI_SERVICE_URL || "http://localhost:8001"}`);
-  console.log(`👁️  Vision AI Service: ${process.env.VISION_AI_SERVICE_URL || "http://localhost:8001"}`);
-  console.log(`🌍 Allowed Origins: ${allowedOrigins.join(", ")}`);
-});
+try {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📦 Backend API: http://localhost:${PORT}`);
+    console.log(`🎁 Gift AI Service: ${process.env.GIFT_AI_SERVICE_URL || "Not configured"}`);
+    console.log(`👁️  Vision AI Service: ${process.env.GENAI_SERVICE_URL || "Not configured"}`);
+    console.log(`🌍 Allowed Origins: ${allowedOrigins.join(", ")}`);
+  });
+} catch (err) {
+  console.error("❌ Server failed to start:", err);
+  process.exit(1);
+}

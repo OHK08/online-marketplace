@@ -69,7 +69,7 @@ app = FastAPI(
 # Define allowed frontend origins
 allowed_origins = [
     "http://localhost:3000",  # local React dev
-    "https://your-frontend.vercel.app",  # replace with your actual Vercel domain
+    "https://art-marketplace-frontend-kboua6urdq-el.a.run.app",  # replace with your actual Vercel domain
 ]
 
 app.add_middleware(
